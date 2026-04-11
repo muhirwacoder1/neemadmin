@@ -1,8 +1,15 @@
+/// <reference types="vite/client" />
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { addVideo, getVideo, updateVideo, uploadVideoThumbnail, type Video, type VideoCategory, type VideoSource } from '../../services/api';
 import { RichTextEditor } from '../../components/RichTextEditor';
 import { ArrowLeft, Upload, Loader2, Save, X, Youtube, Cloud, Film, CheckCircle, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const CATEGORIES: VideoCategory[] = ['General', 'Nutrition', 'Sports', 'Wellness'];
 
@@ -223,286 +230,287 @@ export function AddVideo() {
     const cloudinaryConfigured = !!CLOUDINARY_CLOUD_NAME && !!CLOUDINARY_UPLOAD_PRESET;
 
     return (
-        <div className="max-w-3xl mx-auto animate-fade-in">
+        <div className="max-w-4xl mx-auto animate-fade-in space-y-6 pb-12">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => navigate('/admin/videos')} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
+            <div className="flex items-center gap-4">
+                <Button variant="outline" size="icon" onClick={() => navigate('/admin/videos')}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit Video' : 'Add New Video'}</h1>
-                    <p className="text-slate-500 mt-0.5">Fill in the video details below</p>
+                    <h1 className="text-3xl font-bold tracking-tight">{isEditing ? 'Edit Video' : 'Add New Video'}</h1>
+                    <p className="text-muted-foreground mt-1">Fill in the video details below.</p>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Thumbnail */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                    <h2 className="text-sm font-semibold text-slate-900 mb-1">Thumbnail</h2>
-                    <p className="text-xs text-slate-400 mb-4">Upload a custom thumbnail or use the auto-generated one from YouTube.</p>
-                    {currentThumbnail ? (
-                        <div className="relative group w-full max-w-md aspect-video rounded-xl overflow-hidden border border-slate-200">
-                            <img src={currentThumbnail} alt="" className="w-full h-full object-cover" />
-                            <button type="button" onClick={removeThumbnail}
-                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <X className="w-4 h-4" />
-                            </button>
-                            {thumbnailFile && (
-                                <span className="absolute bottom-2 left-2 text-[10px] font-medium bg-blue-600 text-white px-1.5 py-0.5 rounded">CUSTOM</span>
-                            )}
-                            {!thumbnailFile && !existingThumbnail && form.videoSource === 'youtube' && (
-                                <span className="absolute bottom-2 left-2 text-[10px] font-medium bg-red-500 text-white px-1.5 py-0.5 rounded">AUTO</span>
-                            )}
-                        </div>
-                    ) : (
-                        <label className="w-full max-w-md aspect-video rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 flex flex-col items-center justify-center cursor-pointer transition-colors group">
-                            <Upload className="w-8 h-8 text-slate-300 group-hover:text-blue-400 mb-2" />
-                            <span className="text-sm text-slate-400 group-hover:text-blue-500">Upload Thumbnail</span>
-                            <input type="file" accept="image/*" onChange={handleThumbnailAdd} className="hidden" />
-                        </label>
-                    )}
-                    {currentThumbnail && (
-                        <label className="inline-flex items-center gap-2 mt-3 text-sm text-blue-600 hover:text-blue-700 cursor-pointer">
-                            <Upload className="w-4 h-4" />
-                            <span>Replace thumbnail</span>
-                            <input type="file" accept="image/*" onChange={handleThumbnailAdd} className="hidden" />
-                        </label>
-                    )}
-                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Thumbnail</CardTitle>
+                        <CardDescription>Upload a custom thumbnail or use the auto-generated one from YouTube.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {currentThumbnail ? (
+                            <div className="relative group w-full max-w-md aspect-video rounded-md overflow-hidden border">
+                                <img src={currentThumbnail} alt="" className="w-full h-full object-cover" />
+                                <Button type="button" variant="destructive" size="icon" onClick={removeThumbnail}
+                                    className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <X className="w-4 h-4" />
+                                </Button>
+                                {thumbnailFile && (
+                                    <span className="absolute bottom-2 left-2 text-[10px] font-medium bg-primary text-primary-foreground px-1.5 py-0.5 rounded">CUSTOM</span>
+                                )}
+                                {!thumbnailFile && !existingThumbnail && form.videoSource === 'youtube' && (
+                                    <span className="absolute bottom-2 left-2 text-[10px] font-medium bg-destructive text-destructive-foreground px-1.5 py-0.5 rounded">AUTO</span>
+                                )}
+                            </div>
+                        ) : (
+                            <Label htmlFor="thumbnail-upload" className="w-full max-w-md aspect-video rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary flex flex-col items-center justify-center cursor-pointer transition-colors group">
+                                <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
+                                <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Upload Thumbnail</span>
+                                <input id="thumbnail-upload" type="file" accept="image/*" onChange={handleThumbnailAdd} className="hidden" />
+                            </Label>
+                        )}
+                        {currentThumbnail && (
+                            <div className="mt-3">
+                                <Label htmlFor="thumbnail-replace" className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 cursor-pointer font-medium">
+                                    <Upload className="w-4 h-4" />
+                                    <span>Replace thumbnail</span>
+                                    <input id="thumbnail-replace" type="file" accept="image/*" onChange={handleThumbnailAdd} className="hidden" />
+                                </Label>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Basic Info */}
-                <div className="bg-white rounded-2xl border border-slate-100/60 p-6 shadow-soft space-y-5">
-                    <h2 className="text-sm font-semibold text-slate-900">Basic Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Video Title *</label>
-                            <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                placeholder="e.g. Managing Blood Sugar During Cardio" />
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Basic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="title">Video Title *</Label>
+                                <Input id="title" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Managing Blood Sugar During Cardio" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Category *</Label>
+                                <Select value={form.category} onValueChange={val => setForm({ ...form, category: val as VideoCategory })}>
+                                    <SelectTrigger id="category">
+                                        <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="duration">Duration</Label>
+                                <Input id="duration" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} placeholder="e.g. 12 min" />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Category *</label>
-                            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as VideoCategory })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 bg-white">
-                                {CATEGORIES.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Duration</label>
-                            <input value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                placeholder="e.g. 12 min" />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Video Source */}
-                <div className="bg-white rounded-2xl border border-slate-100/60 p-6 shadow-soft space-y-5">
-                    <h2 className="text-sm font-semibold text-slate-900">Video Source</h2>
-                    {/* Source Toggle */}
-                    <div className="flex gap-3">
-                        <button type="button"
-                            onClick={() => {
-                                setForm({ ...form, videoSource: 'youtube', videoUrl: '' });
-                                setVideoFile(null);
-                                setUploadStatus('idle');
-                            }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all border ${
-                                form.videoSource === 'youtube'
-                                    ? 'bg-red-50 border-red-200 text-red-700'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                            }`}>
-                            <Youtube className="w-5 h-5" /> YouTube
-                        </button>
-                        <button type="button"
-                            onClick={() => {
-                                setForm({ ...form, videoSource: 'cloudinary', videoUrl: '' });
-                                setCloudinaryMode('url');
-                            }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all border ${
-                                form.videoSource === 'cloudinary'
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                            }`}>
-                            <Cloud className="w-5 h-5" /> Cloudinary
-                        </button>
-                    </div>
-
-                    {/* YouTube: URL input */}
-                    {form.videoSource === 'youtube' && (
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">YouTube URL *</label>
-                            <input required value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                placeholder="https://www.youtube.com/watch?v=..." />
-                            <p className="text-xs text-slate-400 mt-1.5">Paste the full YouTube video URL. Thumbnail will be auto-generated.</p>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Video Source</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        {/* Source Toggle */}
+                        <div className="flex gap-3">
+                            <Button
+                                type="button"
+                                variant={form.videoSource === 'youtube' ? "default" : "outline"}
+                                className={`flex-1 ${form.videoSource === 'youtube' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
+                                onClick={() => {
+                                    setForm({ ...form, videoSource: 'youtube', videoUrl: '' });
+                                    setVideoFile(null);
+                                    setUploadStatus('idle');
+                                }}
+                            >
+                                <Youtube className="w-5 h-5 mr-2" /> YouTube
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={form.videoSource === 'cloudinary' ? "default" : "outline"}
+                                className={`flex-1 ${form.videoSource === 'cloudinary' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                                onClick={() => {
+                                    setForm({ ...form, videoSource: 'cloudinary', videoUrl: '' });
+                                    setCloudinaryMode('url');
+                                }}
+                            >
+                                <Cloud className="w-5 h-5 mr-2" /> Cloudinary
+                            </Button>
                         </div>
-                    )}
 
-                    {/* Cloudinary: mode toggle + input */}
-                    {form.videoSource === 'cloudinary' && (
-                        <>
-                            {/* Sub-toggle: Paste URL or Upload File */}
-                            <div className="flex gap-2">
-                                <button type="button"
-                                    onClick={() => { setCloudinaryMode('url'); removeVideoFile(); }}
-                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
-                                        cloudinaryMode === 'url'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                    }`}>
-                                    Paste URL
-                                </button>
-                                <button type="button"
-                                    onClick={() => { setCloudinaryMode('upload'); setForm({ ...form, videoUrl: '' }); }}
-                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-all ${
-                                        cloudinaryMode === 'upload'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                    }`}>
-                                    Upload File
-                                </button>
+                        {/* YouTube: URL input */}
+                        {form.videoSource === 'youtube' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="yt-url">YouTube URL *</Label>
+                                <Input id="yt-url" required value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} placeholder="https://www.youtube.com/watch?v=..." />
+                                <p className="text-[11px] text-muted-foreground">Paste the full YouTube video URL. Thumbnail will be auto-generated.</p>
                             </div>
+                        )}
 
-                            {cloudinaryMode === 'url' && (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-600 mb-1.5">Cloudinary Video URL *</label>
-                                    <input required={cloudinaryMode === 'url'} value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })}
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                        placeholder="https://res.cloudinary.com/..." />
-                                    <p className="text-xs text-slate-400 mt-1.5">Paste the video URL from your Cloudinary dashboard.</p>
+                        {/* Cloudinary: mode toggle + input */}
+                        {form.videoSource === 'cloudinary' && (
+                            <div className="space-y-4">
+                                {/* Sub-toggle: Paste URL or Upload File */}
+                                <div className="flex gap-2">
+                                    <Button type="button" size="sm" variant={cloudinaryMode === 'url' ? "default" : "secondary"} onClick={() => { setCloudinaryMode('url'); removeVideoFile(); }}>
+                                        Paste URL
+                                    </Button>
+                                    <Button type="button" size="sm" variant={cloudinaryMode === 'upload' ? "default" : "secondary"} onClick={() => { setCloudinaryMode('upload'); setForm({ ...form, videoUrl: '' }); }}>
+                                        Upload File
+                                    </Button>
                                 </div>
-                            )}
 
-                            {cloudinaryMode === 'upload' && (
-                                <div className="space-y-3">
-                                    {!cloudinaryConfigured && (
-                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                                            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                            <div>
-                                                <p className="text-sm font-medium text-amber-800">Cloudinary not configured</p>
-                                                <p className="text-xs text-amber-600 mt-1">
-                                                    Create a <code className="bg-amber-100 px-1 rounded">.env</code> file in <code className="bg-amber-100 px-1 rounded">webapp/</code> with:<br />
-                                                    <code className="bg-amber-100 px-1 rounded text-[11px]">VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name</code><br />
-                                                    <code className="bg-amber-100 px-1 rounded text-[11px]">VITE_CLOUDINARY_UPLOAD_PRESET=your_preset</code>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                {cloudinaryMode === 'url' && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cloud-url">Cloudinary Video URL *</Label>
+                                        <Input id="cloud-url" required={cloudinaryMode === 'url'} value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} placeholder="https://res.cloudinary.com/..." />
+                                        <p className="text-[11px] text-muted-foreground">Paste the video URL from your Cloudinary dashboard.</p>
+                                    </div>
+                                )}
 
-                                    {/* File picker */}
-                                    {!videoFile && (
-                                        <label className={`w-full rounded-xl border-2 border-dashed py-8 flex flex-col items-center justify-center cursor-pointer transition-colors group ${
-                                            cloudinaryConfigured ? 'border-slate-200 hover:border-blue-400' : 'border-slate-200 opacity-50 pointer-events-none'
-                                        }`}>
-                                            <Upload className="w-8 h-8 text-slate-300 group-hover:text-blue-400 mb-2" />
-                                            <span className="text-sm text-slate-400 group-hover:text-blue-500">Select video file</span>
-                                            <span className="text-xs text-slate-300 mt-1">MP4, MOV, AVI, WebM</span>
-                                            <input type="file" accept="video/*" onChange={handleVideoFileSelect} className="hidden" />
-                                        </label>
-                                    )}
-
-                                    {/* Selected file info */}
-                                    {videoFile && (
-                                        <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-                                            <div className="flex items-center gap-3">
-                                                <Film className="w-5 h-5 text-blue-500 shrink-0" />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-slate-700 truncate">{videoFile.name}</p>
-                                                    <p className="text-xs text-slate-400">{(videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                                {cloudinaryMode === 'upload' && (
+                                    <div className="space-y-3">
+                                        {!cloudinaryConfigured && (
+                                            <div className="bg-destructive/10 border border-destructive/20 rounded-md p-4 flex items-start gap-3">
+                                                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="text-sm font-medium text-destructive">Cloudinary not configured</p>
+                                                    <p className="text-xs text-destructive/80 mt-1">
+                                                        Create a <code className="bg-background/80 px-1 rounded">.env</code> file in <code className="bg-background/80 px-1 rounded">webapp/</code> with:<br />
+                                                        <code className="bg-background/80 px-1 rounded text-[11px]">VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name</code><br />
+                                                        <code className="bg-background/80 px-1 rounded text-[11px]">VITE_CLOUDINARY_UPLOAD_PRESET=your_preset</code>
+                                                    </p>
                                                 </div>
-                                                {uploadStatus !== 'uploading' && (
-                                                    <button type="button" onClick={removeVideoFile}
-                                                        className="p-1 rounded-full hover:bg-slate-200 text-slate-400">
-                                                        <X className="w-4 h-4" />
-                                                    </button>
+                                            </div>
+                                        )}
+
+                                        {/* File picker */}
+                                        {!videoFile && (
+                                            <Label htmlFor="video-upload" className={`w-full rounded-md border-2 border-dashed py-8 flex flex-col items-center justify-center cursor-pointer transition-colors group ${
+                                                cloudinaryConfigured ? 'border-muted-foreground/25 hover:border-primary' : 'border-muted-foreground/25 opacity-50 pointer-events-none'
+                                            }`}>
+                                                <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
+                                                <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Select video file</span>
+                                                <span className="text-xs text-muted-foreground/70 mt-1">MP4, MOV, AVI, WebM</span>
+                                                <input id="video-upload" type="file" accept="video/*" onChange={handleVideoFileSelect} className="hidden" />
+                                            </Label>
+                                        )}
+
+                                        {/* Selected file info */}
+                                        {videoFile && (
+                                            <div className="bg-muted/50 rounded-md p-4 space-y-3 border">
+                                                <div className="flex items-center gap-3">
+                                                    <Film className="w-5 h-5 text-primary shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-foreground truncate">{videoFile.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{(videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                                                    </div>
+                                                    {uploadStatus !== 'uploading' && (
+                                                        <Button type="button" variant="ghost" size="icon" onClick={removeVideoFile} className="h-8 w-8 text-muted-foreground">
+                                                            <X className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+
+                                                {/* Progress bar */}
+                                                {uploadStatus === 'uploading' && (
+                                                    <div>
+                                                        <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                                                            <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground mt-1.5">Uploading... {uploadProgress}%</p>
+                                                    </div>
+                                                )}
+
+                                                {uploadStatus === 'done' && (
+                                                    <div className="flex items-center gap-2 text-emerald-600">
+                                                        <CheckCircle className="w-4 h-4" />
+                                                        <span className="text-xs font-medium">Upload complete</span>
+                                                    </div>
+                                                )}
+
+                                                {uploadStatus === 'error' && (
+                                                    <div className="flex items-center gap-2 text-destructive">
+                                                        <AlertCircle className="w-4 h-4" />
+                                                        <span className="text-xs font-medium">Upload failed — try again</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Upload button */}
+                                                {(uploadStatus === 'idle' || uploadStatus === 'error') && (
+                                                    <Button type="button" onClick={handleCloudinaryUpload}>
+                                                        <Cloud className="w-4 h-4 mr-2" /> Upload to Cloudinary
+                                                    </Button>
                                                 )}
                                             </div>
+                                        )}
 
-                                            {/* Progress bar */}
-                                            {uploadStatus === 'uploading' && (
-                                                <div>
-                                                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-blue-600 rounded-full transition-all duration-300"
-                                                            style={{ width: `${uploadProgress}%` }} />
-                                                    </div>
-                                                    <p className="text-xs text-slate-400 mt-1.5">Uploading... {uploadProgress}%</p>
-                                                </div>
-                                            )}
-
-                                            {uploadStatus === 'done' && (
-                                                <div className="flex items-center gap-2 text-emerald-600">
-                                                    <CheckCircle className="w-4 h-4" />
-                                                    <span className="text-xs font-medium">Upload complete</span>
-                                                </div>
-                                            )}
-
-                                            {uploadStatus === 'error' && (
-                                                <div className="flex items-center gap-2 text-red-500">
-                                                    <AlertCircle className="w-4 h-4" />
-                                                    <span className="text-xs font-medium">Upload failed — try again</span>
-                                                </div>
-                                            )}
-
-                                            {/* Upload button */}
-                                            {(uploadStatus === 'idle' || uploadStatus === 'error') && (
-                                                <button type="button" onClick={handleCloudinaryUpload}
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-                                                    <Cloud className="w-4 h-4" /> Upload to Cloudinary
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Show final URL if uploaded */}
-                                    {uploadStatus === 'done' && form.videoUrl && (
-                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                                            <p className="text-xs text-emerald-700 font-medium mb-1">Video URL (auto-filled):</p>
-                                            <p className="text-xs text-emerald-600 break-all">{form.videoUrl}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {/* YouTube preview */}
-                    {form.videoUrl && form.videoSource === 'youtube' && extractYouTubeId(form.videoUrl) && (
-                        <div className="bg-slate-50 rounded-xl p-4 flex items-center gap-3">
-                            <Film className="w-5 h-5 text-red-500 shrink-0" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-700 truncate">YouTube Video Detected</p>
-                                <p className="text-xs text-slate-400 truncate">ID: {extractYouTubeId(form.videoUrl)}</p>
+                                        {/* Show final URL if uploaded */}
+                                        {uploadStatus === 'done' && form.videoUrl && (
+                                            <div className="bg-primary/5 border border-primary/20 rounded-md p-3">
+                                                <p className="text-xs text-primary font-medium mb-1">Video URL (auto-filled):</p>
+                                                <p className="text-xs text-primary/80 break-all">{form.videoUrl}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+
+                        {/* YouTube preview */}
+                        {form.videoUrl && form.videoSource === 'youtube' && extractYouTubeId(form.videoUrl) && (
+                            <div className="bg-muted/50 rounded-md p-4 flex items-center gap-3 border">
+                                <Film className="w-5 h-5 text-red-500 shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium text-foreground truncate">YouTube Video Detected</p>
+                                    <p className="text-xs text-muted-foreground truncate">ID: {extractYouTubeId(form.videoUrl)}</p>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Description */}
-                <div className="bg-white rounded-2xl border border-slate-100/60 p-6 shadow-soft space-y-5">
-                    <h2 className="text-sm font-semibold text-slate-900">Description</h2>
-                    <RichTextEditor
-                        value={form.description}
-                        onChange={v => setForm({ ...form, description: v })}
-                        placeholder="Describe what this video covers..."
-                    />
-                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Description</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="border rounded-md overflow-hidden bg-background">
+                            <RichTextEditor
+                                value={form.description}
+                                onChange={v => setForm({ ...form, description: v })}
+                                placeholder="Describe what this video covers..."
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Status & Actions */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex items-center justify-between">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })}
-                            className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                        <span className="text-sm font-medium text-slate-700">Video is active and visible to users</span>
-                    </label>
-                    <button type="submit" disabled={loading}
-                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50">
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        {loading ? 'Saving...' : isEditing ? 'Update Video' : 'Add Video'}
-                    </button>
-                </div>
+                <Card>
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6">
+                        <div className="flex items-center space-x-2">
+                            <Switch 
+                                id="active" 
+                                checked={form.active} 
+                                onCheckedChange={checked => setForm({ ...form, active: checked })} 
+                            />
+                            <Label htmlFor="active" className="cursor-pointer">Video is active and visible to users</Label>
+                        </div>
+                        <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+                            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            {loading ? 'Saving...' : isEditing ? 'Update Video' : 'Add Video'}
+                        </Button>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     );

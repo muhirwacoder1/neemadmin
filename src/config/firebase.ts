@@ -3,14 +3,22 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+const readRequiredEnv = (key: keyof ImportMetaEnv): string => {
+    const value = import.meta.env[key];
+    if (!value) {
+        throw new Error(`Missing required webapp env: ${key}`);
+    }
+    return value;
+};
+
 const firebaseConfig = {
-    apiKey: 'AIzaSyDaFuSQ9lz-3An-5GQ9q8ztzxy91NHAceY',
-    authDomain: 'neem-app-e042d.firebaseapp.com',
-    projectId: 'neem-app-e042d',
-    storageBucket: 'neem-app-e042d.firebasestorage.app',
-    messagingSenderId: '333411713540',
-    appId: '1:333411713540:web:e165f70e1bbcfad1d52b51',
-    measurementId: 'G-1N2R0K9XHM',
+    apiKey: readRequiredEnv('VITE_FIREBASE_API_KEY'),
+    authDomain: readRequiredEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+    projectId: readRequiredEnv('VITE_FIREBASE_PROJECT_ID'),
+    storageBucket: readRequiredEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: readRequiredEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+    appId: readRequiredEnv('VITE_FIREBASE_APP_ID'),
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || undefined,
 };
 
 const app = initializeApp(firebaseConfig);

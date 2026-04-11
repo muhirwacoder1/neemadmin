@@ -5,6 +5,12 @@ import { RichTextEditor } from '../../components/RichTextEditor';
 import { ArrowLeft, Upload, Loader2, Save, X, Eye, EyeOff } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../config/firebase';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 const CATEGORIES: BlogCategory[] = ['Diabetes 101', 'Nutrition', 'Lifestyle', 'Mental Health'];
 
@@ -112,134 +118,137 @@ export function AddBlog() {
     const currentCover = existingCover || coverPreview;
 
     return (
-        <div className="max-w-4xl mx-auto animate-fade-in">
+        <div className="max-w-4xl mx-auto animate-fade-in space-y-6 pb-12">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => navigate('/admin/blogs')} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
+            <div className="flex items-center gap-4">
+                <Button variant="outline" size="icon" onClick={() => navigate('/admin/blogs')}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">{isEditing ? 'Edit Blog Post' : 'Create New Blog Post'}</h1>
-                    <p className="text-slate-500 mt-0.5">Write and publish your blog article</p>
+                    <h1 className="text-3xl font-bold tracking-tight">{isEditing ? 'Edit Blog Post' : 'Create New Blog Post'}</h1>
+                    <p className="text-muted-foreground mt-1">Write and publish your blog article.</p>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Cover Image */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                    <h2 className="text-sm font-semibold text-slate-900 mb-1">Cover Image</h2>
-                    <p className="text-xs text-slate-400 mb-4">This image appears as the blog card thumbnail and hero image.</p>
-                    {currentCover ? (
-                        <div className="relative group w-full max-w-2xl aspect-[16/9] rounded-xl overflow-hidden border border-slate-200">
-                            <img src={currentCover} alt="" className="w-full h-full object-cover" />
-                            <button type="button" onClick={removeCover}
-                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ) : (
-                        <label className="w-full max-w-2xl aspect-[16/9] rounded-xl border-2 border-dashed border-slate-200 hover:border-blue-400 flex flex-col items-center justify-center cursor-pointer transition-colors group">
-                            <Upload className="w-8 h-8 text-slate-300 group-hover:text-blue-400 mb-2" />
-                            <span className="text-sm text-slate-400 group-hover:text-blue-500">Upload Cover Image</span>
-                            <span className="text-xs text-slate-300 mt-1">Recommended: 1200×675px</span>
-                            <input type="file" accept="image/*" onChange={handleCoverAdd} className="hidden" />
-                        </label>
-                    )}
-                    {currentCover && (
-                        <label className="inline-flex items-center gap-2 mt-3 text-sm text-blue-600 hover:text-blue-700 cursor-pointer">
-                            <Upload className="w-4 h-4" />
-                            <span>Replace cover image</span>
-                            <input type="file" accept="image/*" onChange={handleCoverAdd} className="hidden" />
-                        </label>
-                    )}
-                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Cover Image</CardTitle>
+                        <CardDescription>This image appears as the blog card thumbnail and hero image.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {currentCover ? (
+                            <div className="relative group w-full max-w-2xl aspect-[16/9] rounded-md overflow-hidden border">
+                                <img src={currentCover} alt="" className="w-full h-full object-cover" />
+                                <Button type="button" variant="destructive" size="icon" onClick={removeCover}
+                                    className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <Label htmlFor="cover-upload" className="w-full max-w-2xl aspect-[16/9] rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary flex flex-col items-center justify-center cursor-pointer transition-colors group">
+                                <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
+                                <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Upload Cover Image</span>
+                                <span className="text-xs text-muted-foreground/70 mt-1">Recommended: 1200×675px</span>
+                                <input id="cover-upload" type="file" accept="image/*" onChange={handleCoverAdd} className="hidden" />
+                            </Label>
+                        )}
+                        {currentCover && (
+                            <div className="mt-3">
+                                <Label htmlFor="cover-replace" className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium cursor-pointer">
+                                    <Upload className="w-4 h-4" />
+                                    <span>Replace cover image</span>
+                                    <input id="cover-replace" type="file" accept="image/*" onChange={handleCoverAdd} className="hidden" />
+                                </Label>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Basic Info */}
-                <div className="bg-white rounded-2xl border border-slate-100/60 p-6 shadow-soft space-y-5">
-                    <h2 className="text-sm font-semibold text-slate-900">Basic Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Blog Title *</label>
-                            <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                placeholder="e.g. Understanding Your Blood Sugar Levels" />
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Basic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="title">Blog Title *</Label>
+                                <Input id="title" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Understanding Your Blood Sugar Levels" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Category *</Label>
+                                <Select value={form.category} onValueChange={val => setForm({ ...form, category: val as BlogCategory })}>
+                                    <SelectTrigger id="category">
+                                        <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {CATEGORIES.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="readTime">Read Time</Label>
+                                <Input id="readTime" value={form.readTime} onChange={e => setForm({ ...form, readTime: e.target.value })} placeholder="e.g. 5 min read" />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="author">Author</Label>
+                                <Input id="author" value={form.author} onChange={e => setForm({ ...form, author: e.target.value })} placeholder="e.g. MyDiabetes Team" className="max-w-md" />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                                <Label htmlFor="description">Short Description</Label>
+                                <Textarea id="description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Brief preview text shown on the blog card..." />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Category *</label>
-                            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as BlogCategory })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 bg-white">
-                                {CATEGORIES.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Read Time</label>
-                            <input value={form.readTime} onChange={e => setForm({ ...form, readTime: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                placeholder="e.g. 5 min read" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Author</label>
-                            <input value={form.author} onChange={e => setForm({ ...form, author: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                                placeholder="e.g. MyDiabetes Team" />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Short Description</label>
-                            <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                                rows={3}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 resize-none"
-                                placeholder="Brief preview text shown on the blog card..." />
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Content Editor */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
-                    <div>
-                        <h2 className="text-sm font-semibold text-slate-900">Blog Content *</h2>
-                        <p className="text-xs text-slate-400 mt-0.5">Use the toolbar to format text, add images, and embed YouTube videos.</p>
-                    </div>
-                    <RichTextEditor
-                        value={form.content}
-                        onChange={v => setForm({ ...form, content: v })}
-                        placeholder="Start writing your blog article..."
-                        onImageUpload={handleContentImageUpload}
-                        minHeight="400px"
-                    />
-                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Blog Content *</CardTitle>
+                        <CardDescription>Use the toolbar to format text, add images, and embed YouTube videos.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="border rounded-md overflow-hidden bg-background">
+                            <RichTextEditor
+                                value={form.content}
+                                onChange={v => setForm({ ...form, content: v })}
+                                placeholder="Start writing your blog article..."
+                                onImageUpload={handleContentImageUpload}
+                                minHeight="400px"
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Status & Actions */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                    <div className="flex items-center justify-between">
+                <Card>
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6">
                         <div className="flex items-center gap-4">
-                            <button
+                            <Button
                                 type="button"
+                                variant={form.status === 'published' ? "default" : "secondary"}
                                 onClick={() => setForm({ ...form, status: form.status === 'published' ? 'draft' : 'published' })}
-                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
-                                    form.status === 'published'
-                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                        : 'bg-amber-50 border-amber-200 text-amber-700'
-                                }`}
+                                className={form.status === 'published' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
                             >
                                 {form.status === 'published' ? (
-                                    <><Eye className="w-4 h-4" /> Published</>
+                                    <><Eye className="w-4 h-4 mr-2" /> Published</>
                                 ) : (
-                                    <><EyeOff className="w-4 h-4" /> Draft</>
+                                    <><EyeOff className="w-4 h-4 mr-2" /> Draft</>
                                 )}
-                            </button>
-                            <span className="text-xs text-slate-400">
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
                                 {form.status === 'published' ? 'Visible to all users' : 'Only visible to admins'}
                             </span>
                         </div>
-                        <button type="submit" disabled={loading}
-                            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50">
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+                            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                             {loading ? 'Saving...' : isEditing ? 'Update Blog' : 'Create Blog'}
-                        </button>
-                    </div>
-                </div>
+                        </Button>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     );

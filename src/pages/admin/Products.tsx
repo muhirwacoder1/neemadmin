@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts, deleteProduct, type Product } from '../../services/api';
-import { Plus, Search, Pencil, Trash2, Package, Loader2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Package, Loader2, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const PER_PAGE = 10;
 
@@ -40,7 +47,7 @@ export function AdminProducts() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-96">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <div className="w-8 h-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
             </div>
         );
     }
@@ -48,156 +55,163 @@ export function AdminProducts() {
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <p className="text-xs font-medium text-blue-600 uppercase tracking-wider mb-1">Store Management</p>
-                    <h1 className="text-2xl font-bold text-slate-900">Products</h1>
-                    <p className="text-slate-500 text-sm mt-0.5">Manage your marketplace product catalog</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Products</h1>
+                    <p className="text-muted-foreground mt-1">Manage your marketplace product catalog.</p>
                 </div>
-                <button
-                    onClick={() => navigate('/admin/products/add')}
-                    className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-2.5 rounded-xl shadow-soft transition-all"
-                >
-                    <Plus className="w-5 h-5" /> Add Product
-                </button>
+                <Button onClick={() => navigate('/admin/products/add')}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Product
+                </Button>
             </div>
 
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        value={search}
-                        onChange={e => { setSearch(e.target.value); setPage(1); }}
-                        placeholder="Search products..."
-                        className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10"
-                    />
-                </div>
-                <select
-                    value={statusFilter}
-                    onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-                    className="border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-white outline-none focus:border-blue-400"
-                >
-                    <option>All</option>
-                    <option>Active</option>
-                    <option>Inactive</option>
-                </select>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Products</CardTitle>
+                        <Package className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{products.length}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
+                        <Package className="h-4 w-4 text-emerald-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{activeCount}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{products.length - activeCount}</div>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-100/60 shadow-soft overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-slate-100 bg-slate-50/50">
-                                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-6 py-3.5">Product</th>
-                                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3.5">Price</th>
-                                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3.5">Features</th>
-                                <th className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-4 py-3.5">Status</th>
-                                <th className="text-right text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-6 py-3.5">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginated.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-16 text-center">
-                                        <Package className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                                        <p className="text-slate-400">No products found</p>
-                                    </td>
-                                </tr>
-                            ) : paginated.map(product => (
-                                <tr key={product.id} className="border-b border-slate-50/50 last:border-0 hover:bg-slate-50/80 transition-colors group cursor-pointer">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            {product.images?.[0] ? (
-                                                <img src={product.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                                    <Package className="w-5 h-5 text-slate-400" />
-                                                </div>
-                                            )}
-                                            <span className="font-semibold text-slate-900">{product.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-4 text-slate-600 font-medium">{product.priceFormatted}</td>
-                                    <td className="px-4 py-4">
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {product.badges?.slice(0, 3).map(b => (
-                                                <span key={b.id} className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-semibold tracking-wide uppercase">
-                                                    {b.type === 'gf' ? 'GF' : b.type === 'vegan' ? 'Vegan' : b.type === 'organic' ? 'Organic' : b.type}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-4">
-                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 ${product.active ? 'text-emerald-700' : 'text-slate-500'}`}>
-                                            <div className={`w-1.5 h-1.5 rounded-full ${product.active ? 'bg-emerald-400' : 'bg-slate-300'}`} />
-                                            <span className="text-[11px] font-semibold tracking-wide">{product.active ? 'Active' : 'Inactive'}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => navigate(`/admin/products/edit/${product.id}`)}
-                                                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
-                                                title="Edit"
-                                            >
-                                                <Pencil className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(product.id!, product.name)}
-                                                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 text-sm">
-                        <p className="text-slate-400">
-                            Showing {(page - 1) * PER_PAGE + 1} to {Math.min(page * PER_PAGE, filtered.length)} of {filtered.length}
-                        </p>
-                        <div className="flex items-center gap-1">
-                            {Array.from({ length: totalPages }, (_, i) => (
-                                <button
-                                    key={i}
-                                    onClick={() => setPage(i + 1)}
-                                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${page === i + 1 ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                                >
-                                    {i + 1}
-                                </button>
-                            ))}
+            {/* Main Table Card */}
+            <Card>
+                <CardHeader className="pb-4 border-b border-border/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="relative flex-1 sm:max-w-md">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search products..."
+                                value={search}
+                                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                                className="pl-9 h-9"
+                            />
                         </div>
+                        <Select value={statusFilter} onValueChange={val => { val && setStatusFilter(val); setPage(1); }}>
+                            <SelectTrigger className="w-full sm:w-[140px] h-9">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Status</SelectItem>
+                                <SelectItem value="Active">Active</SelectItem>
+                                <SelectItem value="Inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-muted/50">
+                            <TableRow>
+                                <TableHead className="pl-6 h-10 w-[350px]">Product</TableHead>
+                                <TableHead className="h-10 text-right pr-4">Price</TableHead>
+                                <TableHead className="h-10">Features</TableHead>
+                                <TableHead className="h-10">Status</TableHead>
+                                <TableHead className="h-10 text-right pr-6">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {paginated.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-32 text-center border-b-0">
+                                        <div className="flex flex-col items-center justify-center">
+                                            <Package className="h-8 w-8 text-muted-foreground mb-2" />
+                                            <span className="text-muted-foreground font-medium">No products found.</span>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                paginated.map((product) => (
+                                    <TableRow key={product.id}>
+                                        <TableCell className="pl-6">
+                                            <div className="flex items-center gap-3">
+                                                {product.images?.[0] ? (
+                                                    <img src={product.images[0]} alt="" className="w-10 h-10 rounded-md object-cover flex-shrink-0 border" />
+                                                ) : (
+                                                    <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border">
+                                                        <Package className="w-5 h-5 text-muted-foreground" />
+                                                    </div>
+                                                )}
+                                                <span className="text-sm font-medium line-clamp-2">{product.name}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right pr-4 font-medium text-muted-foreground">
+                                            {product.priceFormatted}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-1">
+                                                {product.badges?.slice(0, 3).map(b => (
+                                                    <Badge key={b.id} variant="secondary" className="text-[10px] uppercase font-semibold">
+                                                        {b.type === 'gf' ? 'GF' : b.type === 'vegan' ? 'Vegan' : b.type === 'organic' ? 'Organic' : b.type}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={product.active ? "default" : "secondary"}>
+                                                {product.active ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right pr-6">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-8 w-8 outline-none">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => navigate(`/admin/products/edit/${product.id}`)}>
+                                                        <Pencil className="h-4 w-4 mr-2" /> Edit Product
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer" onClick={() => handleDelete(product.id!, product.name)}>
+                                                        <Trash2 className="h-4 w-4 mr-2" /> Delete Product
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+                {filtered.length > PER_PAGE && (
+                    <div className="flex items-center justify-end gap-2 p-4 border-t border-border/50 bg-muted/20">
+                        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+                            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                        </Button>
+                        <div className="text-sm font-medium text-muted-foreground px-2">
+                            Page {page} of {totalPages}
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+                            Next <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
                     </div>
                 )}
-            </div>
-
-            {/* Bottom Stats */}
-            <div className="grid grid-cols-3 gap-4">
-                {[
-                    { label: 'Total Products', value: products.length, color: 'text-blue-600', icon: Package },
-                    { label: 'Active', value: activeCount, color: 'text-emerald-600', icon: Package },
-                    { label: 'Inactive', value: products.length - activeCount, color: 'text-slate-500', icon: Package },
-                ].map(stat => (
-                    <div key={stat.label} className="bg-white rounded-2xl border border-slate-100/60 shadow-soft p-5 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-                            <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                        </div>
-                        <div>
-                            <p className="text-xl font-bold text-slate-900 leading-tight">{stat.value}</p>
-                            <p className="text-[11px] font-semibold text-slate-400 tracking-wide uppercase">{stat.label}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            </Card>
         </div>
     );
 }

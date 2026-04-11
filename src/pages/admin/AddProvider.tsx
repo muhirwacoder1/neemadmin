@@ -2,6 +2,13 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { addProvider, getProvider, updateProvider, uploadProviderImage, createPhysicianAccount, type Provider } from '../../services/api';
 import { ArrowLeft, Upload, Loader2, Save, KeyRound } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const SPECIALTIES = ['Cardiology', 'Dermatology', 'Endocrinology', 'Psychiatry', 'Nutrition', 'General Practice', 'Pediatrics', 'Neurology'];
@@ -94,166 +101,179 @@ export function AddProvider() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto animate-fade-in">
+        <div className="max-w-4xl mx-auto animate-fade-in space-y-6 pb-12">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-                <button
-                    onClick={() => navigate('/admin/providers')}
-                    className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
+            <div className="flex items-center gap-4">
+                <Button variant="outline" size="icon" onClick={() => navigate('/admin/providers')}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">
+                    <h1 className="text-3xl font-bold tracking-tight">
                         {isEditing ? 'Edit Provider' : 'Add New Provider'}
                     </h1>
-                    <p className="text-slate-500 mt-0.5">Fill in the healthcare provider details</p>
+                    <p className="text-muted-foreground mt-1">Fill in the healthcare provider details below.</p>
                 </div>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Photo Upload */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                    <h2 className="text-sm font-semibold text-slate-900 mb-4">Profile Photo</h2>
-                    <div className="flex items-center gap-6">
-                        {imagePreview ? (
-                            <img src={imagePreview} alt="" className="w-20 h-20 rounded-xl object-cover" />
-                        ) : (
-                            <div className="w-20 h-20 rounded-xl bg-slate-100 flex items-center justify-center">
-                                <Upload className="w-8 h-8 text-slate-400" />
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Profile Photo</CardTitle>
+                        <CardDescription>Upload a professional headshot</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-6">
+                            {imagePreview ? (
+                                <img src={imagePreview} alt="Preview" className="w-24 h-24 rounded-full object-cover border" />
+                            ) : (
+                                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border">
+                                    <Upload className="w-8 h-8 text-muted-foreground/50" />
+                                </div>
+                            )}
+                            <div>
+                                <Label htmlFor="photo-upload" className="cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    Choose photo
+                                </Label>
+                                <input id="photo-upload" type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                                <p className="text-xs text-muted-foreground mt-2">JPG, PNG up to 5MB</p>
                             </div>
-                        )}
-                        <div>
-                            <label className="cursor-pointer inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-4 py-2.5 rounded-xl transition-colors text-sm">
-                                <Upload className="w-4 h-4" />
-                                Choose photo
-                                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                            </label>
-                            <p className="text-xs text-slate-400 mt-2">JPG, PNG up to 5MB</p>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Basic Info */}
-                <div className="bg-white rounded-2xl border border-slate-100/60 p-6 shadow-soft space-y-5">
-                    <h2 className="text-sm font-semibold text-slate-900">Basic Information</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Full Name *</label>
-                            <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" placeholder="Dr. Sarah Lin" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Title *</label>
-                            <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" placeholder="Board-Certified Endocrinologist" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Specialty *</label>
-                            <select required value={form.specialty} onChange={e => setForm({ ...form, specialty: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 bg-white">
-                                {SPECIALTIES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Experience</label>
-                            <input value={form.experience} onChange={e => setForm({ ...form, experience: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" placeholder="10 Years" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Email *</label>
-                            <input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" placeholder="dr.sarah@clinic.com" />
-                        </div>
-                        {!isEditing && (
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1.5">
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <KeyRound className="w-3.5 h-3.5" /> Login Password *
-                                    </span>
-                                </label>
-                                <input required type="password" value={password} onChange={e => setPassword(e.target.value)}
-                                    minLength={6}
-                                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" placeholder="Min 6 characters" />
-                                <p className="text-xs text-slate-400 mt-1.5">This creates the physician's login credentials</p>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Basic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Full Name *</Label>
+                                <Input id="name" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Dr. Sarah Lin" />
                             </div>
-                        )}
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Price per session</label>
-                            <input value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" placeholder="$120" />
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Title *</Label>
+                                <Input id="title" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Board-Certified Endocrinologist" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="specialty">Specialty *</Label>
+                                <Select required value={form.specialty} onValueChange={val => val && setForm({ ...form, specialty: val })}>
+                                    <SelectTrigger id="specialty">
+                                        <SelectValue placeholder="Select specialty" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {SPECIALTIES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="experience">Experience</Label>
+                                <Input id="experience" value={form.experience} onChange={e => setForm({ ...form, experience: e.target.value })} placeholder="10 Years" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email *</Label>
+                                <Input id="email" required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="dr.sarah@clinic.com" />
+                            </div>
+                            {!isEditing && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="password" className="flex items-center gap-1.5">
+                                        <KeyRound className="w-4 h-4 text-muted-foreground" /> Login Password *
+                                    </Label>
+                                    <Input id="password" required type="password" value={password} onChange={e => setPassword(e.target.value || '')} minLength={6} placeholder="Min 6 characters" />
+                                    <p className="text-[11px] text-muted-foreground">This creates the physician's login credentials</p>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="price">Price per session</Label>
+                                <Input id="price" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="$120" />
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-1.5">About / Session Description *</label>
-                        <textarea required rows={4} value={form.about} onChange={e => setForm({ ...form, about: e.target.value })}
-                            className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 resize-none" placeholder="Describe the healthcare provider's expertise and session details..." />
-                    </div>
-                </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="about">About / Session Description *</Label>
+                            <Textarea id="about" required rows={4} value={form.about} onChange={e => setForm({ ...form, about: e.target.value })} placeholder="Describe the healthcare provider's expertise and session details..." />
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Availability */}
-                <div className="bg-white rounded-2xl border border-slate-100/60 p-6 shadow-soft space-y-5">
-                    <h2 className="text-sm font-semibold text-slate-900">Availability</h2>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-600 mb-3">Available Days</label>
-                        <div className="flex flex-wrap gap-2">
-                            {DAYS.map(day => (
-                                <button
-                                    key={day}
-                                    type="button"
-                                    onClick={() => toggleDay(day)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${form.availableDays.includes(day)
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                        }`}
-                                >
-                                    {day.slice(0, 3)}
-                                </button>
-                            ))}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Availability</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="space-y-3">
+                            <Label>Available Days</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {DAYS.map(day => (
+                                    <Button
+                                        key={day}
+                                        type="button"
+                                        variant={form.availableDays.includes(day) ? "default" : "outline"}
+                                        onClick={() => toggleDay(day)}
+                                        className="h-9"
+                                    >
+                                        {day.slice(0, 3)}
+                                    </Button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Start Time</label>
-                            <input type="time" value={form.availableHours.start}
-                                onChange={e => setForm({ ...form, availableHours: { ...form.availableHours, start: e.target.value } })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="space-y-2">
+                                <Label htmlFor="startTime">Start Time</Label>
+                                <Input
+                                    id="startTime"
+                                    type="time" 
+                                    value={form.availableHours.start}
+                                    onChange={e => setForm({ ...form, availableHours: { ...form.availableHours, start: e.target.value } })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="endTime">End Time</Label>
+                                <Input
+                                    id="endTime"
+                                    type="time" 
+                                    value={form.availableHours.end}
+                                    onChange={e => setForm({ ...form, availableHours: { ...form.availableHours, end: e.target.value } })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="slotDuration">Slot Duration</Label>
+                                <Select value={form.timeSlotDuration.toString()} onValueChange={val => setForm({ ...form, timeSlotDuration: Number(val) })}>
+                                    <SelectTrigger id="slotDuration">
+                                        <SelectValue placeholder="Select duration" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="15">15 minutes</SelectItem>
+                                        <SelectItem value="30">30 minutes</SelectItem>
+                                        <SelectItem value="45">45 minutes</SelectItem>
+                                        <SelectItem value="60">60 minutes</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">End Time</label>
-                            <input type="time" value={form.availableHours.end}
-                                onChange={e => setForm({ ...form, availableHours: { ...form.availableHours, end: e.target.value } })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Slot Duration</label>
-                            <select value={form.timeSlotDuration} onChange={e => setForm({ ...form, timeSlotDuration: Number(e.target.value) })}
-                                className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 bg-white">
-                                <option value={15}>15 minutes</option>
-                                <option value={30}>30 minutes</option>
-                                <option value={45}>45 minutes</option>
-                                <option value={60}>60 minutes</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Status & Actions */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex items-center justify-between">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })}
-                            className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                        <span className="text-sm font-medium text-slate-700">Provider is active and visible to patients</span>
-                    </label>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50"
-                    >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                        {loading ? 'Saving...' : isEditing ? 'Update Provider' : 'Add Provider'}
-                    </button>
-                </div>
+                <Card>
+                    <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6">
+                        <div className="flex items-center space-x-2">
+                            <Switch 
+                                id="active" 
+                                checked={form.active} 
+                                onCheckedChange={checked => setForm({ ...form, active: checked })} 
+                            />
+                            <Label htmlFor="active" className="cursor-pointer">Provider is active and visible to patients</Label>
+                        </div>
+                        <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+                            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            {loading ? 'Saving...' : isEditing ? 'Update Provider' : 'Add Provider'}
+                        </Button>
+                    </CardContent>
+                </Card>
             </form>
         </div>
     );

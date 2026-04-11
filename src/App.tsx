@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { Sidebar } from './components/Sidebar';
+import { AppSidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LoginPage } from './pages/LoginPage';
 import { AdminDashboard } from './pages/admin/Dashboard';
@@ -10,29 +10,41 @@ import { AddProvider } from './pages/admin/AddProvider';
 import { AdminAppointments } from './pages/admin/Appointments';
 import { AdminProducts } from './pages/admin/Products';
 import { AddProduct } from './pages/admin/AddProduct';
+import { AdminOrders } from './pages/admin/Orders';
+import { AdminTestimonials } from './pages/admin/Testimonials';
 import { AdminVideos } from './pages/admin/Videos';
 import { AddVideo } from './pages/admin/AddVideo';
 import { AdminBlogs } from './pages/admin/Blogs';
 import { AddBlog } from './pages/admin/AddBlog';
+import { AdminPodcasts } from './pages/admin/Podcasts';
+import { AddPodcast } from './pages/admin/AddPodcast';
+import { AdminLearningMaterials } from './pages/admin/LearningMaterials';
+import { AddLearningMaterial } from './pages/admin/AddLearningMaterial';
+import { AdminActiveExercises } from './pages/admin/ActiveExercises';
+import { AddActiveExercise } from './pages/admin/AddActiveExercise';
+import { AdminPatients } from './pages/admin/Patients';
+import { AdminPatientInfo } from './pages/admin/PatientInfo';
 import { PhysicianDashboard } from './pages/physician/Dashboard';
 import { PhysicianAppointments } from './pages/physician/Appointments';
 import { PhysicianProfile } from './pages/physician/Profile';
 
-function DashboardLayout() {
-    const [collapsed, setCollapsed] = useState(false);
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
+function DashboardLayout() {
     return (
-        <div className="flex min-h-screen bg-slate-100/40">
-            <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
-            <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${collapsed ? 'ml-[68px]' : 'ml-64'}`}>
-                <Header />
-                <main className="flex-1 overflow-auto">
-                    <div className="max-w-[1400px] mx-auto w-full p-4 md:p-6 lg:p-8">
-                        <Outlet />
-                    </div>
-                </main>
+        <SidebarProvider>
+            <div className="flex min-h-screen bg-background w-full">
+                <AppSidebar />
+                <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+                    <Header />
+                    <main className="flex-1 overflow-auto bg-muted/30">
+                        <div className="max-w-[1400px] mx-auto w-full p-4 md:p-6 lg:p-8">
+                            <Outlet />
+                        </div>
+                    </main>
+                </div>
             </div>
-        </div>
+        </SidebarProvider>
     );
 }
 
@@ -77,16 +89,29 @@ export default function App() {
                     <Route path="/admin/providers" element={<AdminProviders />} />
                     <Route path="/admin/providers/add" element={<AddProvider />} />
                     <Route path="/admin/providers/edit/:id" element={<AddProvider />} />
+                    <Route path="/admin/patients" element={<AdminPatients />} />
+                    <Route path="/admin/patients/:id" element={<AdminPatientInfo />} />
                     <Route path="/admin/appointments" element={<AdminAppointments />} />
                     <Route path="/admin/products" element={<AdminProducts />} />
                     <Route path="/admin/products/add" element={<AddProduct />} />
                     <Route path="/admin/products/edit/:id" element={<AddProduct />} />
+                    <Route path="/admin/orders" element={<AdminOrders />} />
+                    <Route path="/admin/testimonials" element={<AdminTestimonials />} />
                     <Route path="/admin/videos" element={<AdminVideos />} />
                     <Route path="/admin/videos/add" element={<AddVideo />} />
                     <Route path="/admin/videos/edit/:id" element={<AddVideo />} />
                     <Route path="/admin/blogs" element={<AdminBlogs />} />
                     <Route path="/admin/blogs/add" element={<AddBlog />} />
                     <Route path="/admin/blogs/edit/:id" element={<AddBlog />} />
+                    <Route path="/admin/learning" element={<AdminLearningMaterials />} />
+                    <Route path="/admin/learning/add" element={<AddLearningMaterial />} />
+                    <Route path="/admin/learning/edit/:id" element={<AddLearningMaterial />} />
+                    <Route path="/admin/active" element={<AdminActiveExercises />} />
+                    <Route path="/admin/active/add" element={<AddActiveExercise />} />
+                    <Route path="/admin/active/edit/:id" element={<AddActiveExercise />} />
+                    <Route path="/admin/podcasts" element={<AdminPodcasts />} />
+                    <Route path="/admin/podcasts/add" element={<AddPodcast />} />
+                    <Route path="/admin/podcasts/edit/:id" element={<AddPodcast />} />
                 </Route>
             </Route>
 

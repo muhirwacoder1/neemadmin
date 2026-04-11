@@ -17,14 +17,10 @@ export function PhysicianDashboard() {
         (async () => {
             try {
                 const providers = await getProviders();
-                console.log('Logged in user:', { email: user.email, uid: user.uid });
-                console.log('All providers:', providers.map(p => ({ id: p.id, email: p.email, uid: p.uid })));
                 const myProvider = providers.find(p => p.email === user.email || p.uid === user.uid);
-                console.log('Matched provider:', myProvider ? { id: myProvider.id, email: myProvider.email, uid: myProvider.uid } : 'NONE');
                 setProvider(myProvider || null);
                 if (myProvider?.id) {
                     const apts = await getAppointments({ providerId: myProvider.id });
-                    console.log('Appointments found:', apts.length);
                     setAppointments(apts);
                 }
             } catch (e) { console.error('Physician dashboard error:', e); }

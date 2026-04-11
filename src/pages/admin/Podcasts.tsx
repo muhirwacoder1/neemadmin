@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getVideos, deleteVideo, type Video } from '../../services/api';
-import { Plus, Search, Pencil, Trash2, Film, Loader2, Youtube, Cloud, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getPodcasts, deletePodcast, type Podcast } from '../../services/api';
+import { Plus, Search, Pencil, Trash2, Mic, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,39 +12,37 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 const PER_PAGE = 10;
 
-export function AdminVideos() {
-    const [videos, setVideos] = useState<Video[]>([]);
+export function AdminPodcasts() {
+    const [podcasts, setPodcasts] = useState<Podcast[]>([]);
     const [search, setSearch] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const navigate = useNavigate();
 
     useEffect(() => {
-        getVideos().then(v => { setVideos(v); setLoading(false); }).catch(() => setLoading(false));
+        getPodcasts().then(p => { setPodcasts(p); setLoading(false); }).catch(() => setLoading(false));
     }, []);
 
     const handleDelete = async (id: string, title: string) => {
-        if (!confirm(`Delete video "${title}"? This cannot be undone.`)) return;
+        if (!confirm(`Delete podcast "${title}"? This cannot be undone.`)) return;
         try {
-            await deleteVideo(id);
-            setVideos(prev => prev.filter(v => v.id !== id));
+            await deletePodcast(id);
+            setPodcasts(prev => prev.filter(p => p.id !== id));
         } catch (e: any) {
             alert('Error: ' + e.message);
         }
     };
 
-    const filtered = videos.filter(v => {
-        const matchSearch = v.title.toLowerCase().includes(search.toLowerCase());
-        const matchCategory = categoryFilter === 'All' || v.category === categoryFilter;
-        const matchStatus = statusFilter === 'All' || (statusFilter === 'Active' ? v.active : !v.active);
-        return matchSearch && matchCategory && matchStatus;
+    const filtered = podcasts.filter(p => {
+        const matchSearch = p.title.toLowerCase().includes(search.toLowerCase());
+        const matchStatus = statusFilter === 'All' || (statusFilter === 'Active' ? p.active : !p.active);
+        return matchSearch && matchStatus;
     });
 
     const totalPages = Math.ceil(filtered.length / PER_PAGE);
     const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-    const activeCount = videos.filter(v => v.active).length;
+    const activeCount = podcasts.filter(p => p.active).length;
 
     if (loading) {
         return (
@@ -59,12 +57,12 @@ export function AdminVideos() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Videos</h1>
-                    <p className="text-muted-foreground mt-1">Manage educational video content.</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Podcasts</h1>
+                    <p className="text-muted-foreground mt-1">Manage your podcast episodes and audio content.</p>
                 </div>
-                <Button onClick={() => navigate('/admin/videos/add')}>
+                <Button onClick={() => navigate('/admin/podcasts/add')}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Video
+                    Add Podcast
                 </Button>
             </div>
 
@@ -72,17 +70,17 @@ export function AdminVideos() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Videos</CardTitle>
-                        <Film className="h-4 w-4 text-primary" />
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Podcasts</CardTitle>
+                        <Mic className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{videos.length}</div>
+                        <div className="text-2xl font-bold">{podcasts.length}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-                        <Film className="h-4 w-4 text-emerald-500" />
+                        <Mic className="h-4 w-4 text-emerald-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{activeCount}</div>
@@ -91,10 +89,10 @@ export function AdminVideos() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
-                        <Film className="h-4 w-4 text-muted-foreground" />
+                        <Mic className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{videos.length - activeCount}</div>
+                        <div className="text-2xl font-bold">{podcasts.length - activeCount}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -106,45 +104,29 @@ export function AdminVideos() {
                         <div className="relative flex-1 sm:max-w-md">
                             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search videos..."
+                                placeholder="Search podcasts..."
                                 value={search}
                                 onChange={e => { setSearch(e.target.value); setPage(1); }}
                                 className="pl-9 h-9"
                             />
                         </div>
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <Select value={categoryFilter} onValueChange={val => { if (val) setCategoryFilter(val); setPage(1); }}>
-                                <SelectTrigger className="w-full sm:w-[150px] h-9">
-                                    <SelectValue placeholder="Category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">All Categories</SelectItem>
-                                    <SelectItem value="General">General</SelectItem>
-                                    <SelectItem value="Nutrition">Nutrition</SelectItem>
-                                    <SelectItem value="Sports">Sports</SelectItem>
-                                    <SelectItem value="Wellness">Wellness</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select value={statusFilter} onValueChange={val => { if (val) setStatusFilter(val); setPage(1); }}>
-                                <SelectTrigger className="w-full sm:w-[130px] h-9">
-                                    <SelectValue placeholder="Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">All Status</SelectItem>
-                                    <SelectItem value="Active">Active</SelectItem>
-                                    <SelectItem value="Inactive">Inactive</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <Select value={statusFilter} onValueChange={val => { if (val) setStatusFilter(val); setPage(1); }}>
+                            <SelectTrigger className="w-full sm:w-[140px] h-9">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Status</SelectItem>
+                                <SelectItem value="Active">Active</SelectItem>
+                                <SelectItem value="Inactive">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
                         <TableHeader className="bg-muted/50">
                             <TableRow>
-                                <TableHead className="pl-6 h-10 w-[300px]">Video</TableHead>
-                                <TableHead className="h-10">Category</TableHead>
-                                <TableHead className="h-10">Source</TableHead>
+                                <TableHead className="pl-6 h-10 w-[350px]">Podcast</TableHead>
                                 <TableHead className="h-10">Duration</TableHead>
                                 <TableHead className="h-10">Status</TableHead>
                                 <TableHead className="h-10 text-right pr-6">Actions</TableHead>
@@ -153,46 +135,35 @@ export function AdminVideos() {
                         <TableBody>
                             {paginated.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-32 text-center border-b-0">
+                                    <TableCell colSpan={4} className="h-32 text-center border-b-0">
                                         <div className="flex flex-col items-center justify-center">
-                                            <Film className="h-8 w-8 text-muted-foreground mb-2" />
-                                            <span className="text-muted-foreground font-medium">No videos found.</span>
+                                            <Mic className="h-8 w-8 text-muted-foreground mb-2" />
+                                            <span className="text-muted-foreground font-medium">No podcasts found.</span>
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                paginated.map(video => (
-                                    <TableRow key={video.id}>
+                                paginated.map(podcast => (
+                                    <TableRow key={podcast.id}>
                                         <TableCell className="pl-6">
                                             <div className="flex items-center gap-3">
-                                                {video.thumbnail ? (
-                                                    <img src={video.thumbnail} alt="" className="w-16 h-10 rounded-md object-cover flex-shrink-0 border" />
+                                                {podcast.thumbnail ? (
+                                                    <img src={podcast.thumbnail} alt="" className="w-12 h-12 rounded-md object-cover flex-shrink-0 border" />
                                                 ) : (
-                                                    <div className="w-16 h-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border">
-                                                        <Film className="w-5 h-5 text-muted-foreground" />
+                                                    <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border">
+                                                        <Mic className="w-5 h-5 text-muted-foreground" />
                                                     </div>
                                                 )}
-                                                <span className="text-sm font-medium line-clamp-2">{video.title}</span>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-sm font-medium leading-none truncate">{podcast.title}</span>
+                                                    <span className="text-xs text-muted-foreground mt-1 truncate max-w-[250px]">{podcast.description}</span>
+                                                </div>
                                             </div>
                                         </TableCell>
+                                        <TableCell className="text-muted-foreground">{podcast.duration}</TableCell>
                                         <TableCell>
-                                            <Badge variant="secondary" className="font-medium">
-                                                {video.category}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                                                {video.videoSource === 'youtube' ? (
-                                                    <><Youtube className="w-4 h-4 text-red-500" /><span className="text-xs">YouTube</span></>
-                                                ) : (
-                                                    <><Cloud className="w-4 h-4 text-blue-500" /><span className="text-xs">Cloudinary</span></>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">{video.duration}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={video.active ? "default" : "secondary"}>
-                                                {video.active ? 'Active' : 'Inactive'}
+                                            <Badge variant={podcast.active ? "default" : "secondary"}>
+                                                {podcast.active ? 'Active' : 'Inactive'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right pr-6">
@@ -202,12 +173,12 @@ export function AdminVideos() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => navigate(`/admin/videos/edit/${video.id}`)}>
-                                                        <Pencil className="h-4 w-4 mr-2" /> Edit Video
+                                                    <DropdownMenuItem onClick={() => navigate(`/admin/podcasts/edit/${podcast.id}`)}>
+                                                        <Pencil className="h-4 w-4 mr-2" /> Edit Podcast
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer" onClick={() => handleDelete(video.id!, video.title)}>
-                                                        <Trash2 className="h-4 w-4 mr-2" /> Delete Video
+                                                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer" onClick={() => handleDelete(podcast.id!, podcast.title)}>
+                                                        <Trash2 className="h-4 w-4 mr-2" /> Delete Podcast
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>

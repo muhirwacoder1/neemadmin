@@ -1,17 +1,29 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-    LayoutDashboard, Users, CalendarCheck, UserCircle, LogOut, Stethoscope, Settings, ChevronsLeft, ChevronsRight, ShoppingBag, Video, FileText,
+    LayoutDashboard, Users, CalendarCheck, UserCircle, LogOut, Stethoscope, ShoppingBag, Video, FileText, Mic, BookOpen, Activity, PackageCheck, Star,
 } from 'lucide-react';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    useSidebar,
+} from "@/components/ui/sidebar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-interface SidebarProps {
-    collapsed: boolean;
-    onToggle: () => void;
-}
-
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function AppSidebar() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const { state } = useSidebar();
+    const collapsed = state === "collapsed";
 
     const handleLogout = async () => {
         await logout();
@@ -23,11 +35,16 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const adminLinks = [
         { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
         { to: '/admin/providers', icon: Users, label: 'Providers' },
+        { to: '/admin/patients', icon: UserCircle, label: 'Patients' },
         { to: '/admin/products', icon: ShoppingBag, label: 'Products' },
+        { to: '/admin/orders', icon: PackageCheck, label: 'Orders' },
+        { to: '/admin/testimonials', icon: Star, label: 'Testimonials' },
         { to: '/admin/videos', icon: Video, label: 'Videos' },
+        { to: '/admin/podcasts', icon: Mic, label: 'Podcasts' },
         { to: '/admin/blogs', icon: FileText, label: 'Blogs' },
+        { to: '/admin/learning', icon: BookOpen, label: 'Learn Hub' },
+        { to: '/admin/active', icon: Activity, label: 'Be Active' },
         { to: '/admin/appointments', icon: CalendarCheck, label: 'Appointments' },
-        { to: '/admin/settings', icon: Settings, label: 'Settings' },
     ];
 
     const physicianLinks = [
@@ -39,98 +56,70 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const links = isAdmin ? adminLinks : physicianLinks;
 
     return (
-        <aside className={`fixed left-0 top-0 bottom-0 bg-slate-900 flex flex-col z-50 transition-all duration-300 ${collapsed ? 'w-[68px]' : 'w-64'}`}>
-            {/* Logo */}
-            <div className={`h-16 flex items-center border-b border-white/10 shrink-0 ${collapsed ? 'px-4 justify-center' : 'px-6 gap-3'}`}>
-                <div className="w-8 h-8 rounded-lg bg-blue-600 shadow-lg shadow-blue-600/20 flex items-center justify-center shrink-0">
-                    <Stethoscope className="w-4 h-4 text-white" />
-                </div>
-                {!collapsed && (
-                    <div className="min-w-0">
-                        <h1 className="text-white font-bold text-base leading-none tracking-tight">Neem</h1>
-                        <p className="text-slate-400 text-[10px] font-medium mt-0.5 tracking-wide uppercase">{isAdmin ? 'Admin' : 'Physician'}</p>
+        <Sidebar variant="sidebar" collapsible="icon">
+            <SidebarHeader className="p-4 border-b border-border/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary flex flex-shrink-0 items-center justify-center text-primary-foreground shadow-sm">
+                        <Stethoscope className="w-4 h-4" />
                     </div>
-                )}
-            </div>
-
-            {/* Navigation */}
-            <nav className={`flex-1 py-6 overflow-y-auto ${collapsed ? 'px-2' : 'px-4'}`}>
-                {!collapsed && (
-                    <p className="px-3 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">Menu</p>
-                )}
-                <div className="space-y-1">
-                    {links.map(link => (
-                        <NavLink
-                            key={link.to}
-                            to={link.to}
-                            end={link.to === '/admin' || link.to === '/physician'}
-                            title={collapsed ? link.label : undefined}
-                            className={({ isActive }) =>
-                                `relative flex items-center rounded-lg text-[13px] font-medium transition-all duration-200 ${
-                                    collapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
-                                } ${isActive
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
-                                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                                }`
-                            }
-                        >
-                            <link.icon className={`w-[18px] h-[18px] shrink-0 ${collapsed ? '' : 'transition-transform duration-200 group-hover:scale-110'}`} />
-                            {!collapsed && <span>{link.label}</span>}
-                        </NavLink>
-                    ))}
+                    {!collapsed && (
+                        <div className="flex flex-col min-w-0 transition-opacity">
+                            <span className="font-semibold text-foreground leading-tight tracking-tight">Neem</span>
+                            <span className="text-[10px] text-muted-foreground uppercase font-medium tracking-wider">{isAdmin ? 'Admin' : 'Physician'}</span>
+                        </div>
+                    )}
                 </div>
-            </nav>
+            </SidebarHeader>
 
-            {/* Collapse toggle */}
-            <div className={`px-3 py-2 shrink-0 ${collapsed ? 'flex justify-center' : ''}`}>
-                <button
-                    onClick={onToggle}
-                    className={`flex items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white transition-all duration-150 ${
-                        collapsed ? 'p-2.5 justify-center' : 'gap-3 px-3 py-2 w-full'
-                    }`}
-                    title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                >
-                    {collapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
-                    {!collapsed && <span className="text-sm">Collapse</span>}
-                </button>
-            </div>
+            <SidebarContent>
+                <SidebarGroup>
+                    <SidebarGroupLabel>Menu</SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            {links.map((link) => (
+                                <SidebarMenuItem key={link.to}>
+                                    <SidebarMenuButton tooltip={link.label}>
+                                        <NavLink
+                                            to={link.to}
+                                            end={link.to === '/admin' || link.to === '/physician'}
+                                            className={({ isActive }) =>
+                                                `flex items-center gap-2 w-full ${isActive ? "text-accent-foreground font-medium" : "text-muted-foreground"}`
+                                            }
+                                        >
+                                            <link.icon className="h-4 w-4" />
+                                            <span>{link.label}</span>
+                                        </NavLink>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+            </SidebarContent>
 
-            {/* User Profile & Logout */}
-            <div className={`py-3 border-t border-white/10 shrink-0 ${collapsed ? 'px-2' : 'px-4'}`}>
-                {collapsed ? (
-                    <div className="flex flex-col items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold" title={user?.displayName || user?.email || ''}>
-                            {user?.displayName?.[0] || user?.email?.[0]?.toUpperCase() || '?'}
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="p-2 rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                            title="Sign out"
-                        >
-                            <LogOut className="w-4 h-4" />
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        <div className="flex items-center gap-3 px-2 py-2 mb-1 rounded-lg hover:bg-white/5 transition-colors cursor-default">
-                            <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0">
-                                {user?.displayName?.[0] || user?.email?.[0]?.toUpperCase() || '?'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-white text-[13px] font-semibold truncate leading-tight">{user?.displayName || 'User'}</p>
-                                <p className="text-slate-400 text-[11px] truncate">{user?.email}</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-[13px] font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                        >
-                            <LogOut className="w-[18px] h-[18px]" />
-                            <span>Sign out</span>
-                        </button>
-                    </>
-                )}
-            </div>
-        </aside>
+            <SidebarFooter className="border-t border-border/50 p-2">
+                <DropdownMenu>
+                    <DropdownMenuTrigger className="flex w-full items-center p-2 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none">
+                            <Avatar className="h-8 w-8 rounded-md">
+                                <AvatarFallback className="rounded-md bg-primary/10 text-primary font-semibold">
+                                    {user?.displayName?.[0] || user?.email?.[0]?.toUpperCase() || '?'}
+                                </AvatarFallback>
+                            </Avatar>
+                            {!collapsed && (
+                                <div className="grid flex-1 text-left text-sm leading-tight ml-2">
+                                    <span className="truncate font-semibold">{user?.displayName || 'User'}</span>
+                                    <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
+                                </div>
+                            )}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="start" side="right" sideOffset={4}>
+                        <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10 cursor-pointer">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Log out</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </SidebarFooter>
+        </Sidebar>
     );
 }
