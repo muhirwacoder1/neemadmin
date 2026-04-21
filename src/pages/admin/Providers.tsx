@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-const SPECIALTIES = ['All', 'Cardiology', 'Dermatology', 'Endocrinology', 'Psychiatry', 'Nutrition', 'General Practice', 'Pediatrics', 'Neurology'];
+const SPECIALTIES = ['All', 'Endocrinology', 'General Practitioner', 'Nutritionist', 'Nurse', 'P & O', 'Physiotherapist', 'Fitness Coach'];
 const PER_PAGE = 10;
 
 export function AdminProviders() {

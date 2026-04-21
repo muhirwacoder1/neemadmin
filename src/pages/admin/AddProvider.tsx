@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const SPECIALTIES = ['Cardiology', 'Dermatology', 'Endocrinology', 'Psychiatry', 'Nutrition', 'General Practice', 'Pediatrics', 'Neurology'];
+const SPECIALTIES = ['Endocrinology', 'General Practitioner', 'Nutritionist', 'Nurse', 'P & O', 'Physiotherapist', 'Fitness Coach'];
 
 export function AddProvider() {
     const { id } = useParams();
