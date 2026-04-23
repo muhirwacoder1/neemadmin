@@ -27,6 +27,10 @@ import { AdminPatientInfo } from './pages/admin/PatientInfo';
 import { PhysicianDashboard } from './pages/physician/Dashboard';
 import { PhysicianAppointments } from './pages/physician/Appointments';
 import { PhysicianProfile } from './pages/physician/Profile';
+import { BroadcastNew } from './pages/admin/BroadcastNew';
+import { BroadcastHistory } from './pages/admin/BroadcastHistory';
+import { AccessDenied } from './pages/AccessDenied';
+import { useIsAdmin } from './hooks/useIsAdmin';
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -67,6 +71,19 @@ function ProtectedRoute({ allowedRoles }: { allowedRoles: string[] }) {
     return <Outlet />;
 }
 
+function AdminGate() {
+    const { isAdmin, loading } = useIsAdmin();
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+            </div>
+        );
+    }
+    if (!isAdmin) return <AccessDenied />;
+    return <Outlet />;
+}
+
 function RootRedirect() {
     const { user, loading } = useAuth();
     if (loading) return null;
@@ -84,8 +101,11 @@ export default function App() {
 
             {/* Admin Routes */}
             <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+              <Route element={<AdminGate />}>
                 <Route element={<DashboardLayout />}>
                     <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/broadcast/new" element={<BroadcastNew />} />
+                    <Route path="/admin/broadcast/history" element={<BroadcastHistory />} />
                     <Route path="/admin/providers" element={<AdminProviders />} />
                     <Route path="/admin/providers/add" element={<AddProvider />} />
                     <Route path="/admin/providers/edit/:id" element={<AddProvider />} />
@@ -113,6 +133,7 @@ export default function App() {
                     <Route path="/admin/podcasts/add" element={<AddPodcast />} />
                     <Route path="/admin/podcasts/edit/:id" element={<AddPodcast />} />
                 </Route>
+              </Route>
             </Route>
 
             {/* Physician Routes */}

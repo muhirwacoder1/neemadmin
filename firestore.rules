@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// NOTE: If your mobile app already deploys its own firestore.rules, merge the
+// blocks below into the existing file rather than replacing it. The admin +
+// broadcast rules here are additive.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Admin gate doc. Users can only read their own doc (to check their own status).
+    // Writes are server-only (create admin docs via console or a trusted script).
+    match /admins/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // User profile docs. Owner can read/write own doc. Admins can read for targeting.
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if false;
+
+      // In-app notification inbox. Server-only writes; owner may read and mark readAt.
+      match /notifications/{notifId} {
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow update: if isSignedIn()
+                      && request.auth.uid == uid
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']);
+        allow create, delete: if false;
+      }
+    }
+
+    // Broadcast audit log. Admins read, server writes.
+    match /broadcasts/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

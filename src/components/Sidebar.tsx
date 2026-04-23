@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-    LayoutDashboard, Users, CalendarCheck, UserCircle, LogOut, Stethoscope, ShoppingBag, Video, FileText, Mic, BookOpen, Activity, PackageCheck, Star,
+    LayoutDashboard, Users, CalendarCheck, UserCircle, LogOut, Stethoscope, ShoppingBag, Video, FileText, Mic, BookOpen, Activity, PackageCheck, Star, Megaphone,
 } from 'lucide-react';
 import {
     Sidebar,
@@ -45,6 +45,7 @@ export function AppSidebar() {
         { to: '/admin/learning', icon: BookOpen, label: 'Learn Hub' },
         { to: '/admin/active', icon: Activity, label: 'Be Active' },
         { to: '/admin/appointments', icon: CalendarCheck, label: 'Appointments' },
+        { to: '/admin/broadcast/new', icon: Megaphone, label: 'Broadcasts' },
     ];
 
     const physicianLinks = [
