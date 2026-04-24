@@ -43,8 +43,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
 
 async function assertAdmin(uid: string | undefined): Promise<string> {
     if (!uid) throw new HttpsError('unauthenticated', 'Sign-in required.');
-    const snap = await db.doc(`admins/${uid}`).get();
-    if (!snap.exists) throw new HttpsError('permission-denied', 'Admin access required.');
+    const snap = await db.doc(`users/${uid}`).get();
+    if (!snap.exists || snap.data()?.role !== 'admin') {
+        throw new HttpsError('permission-denied', 'Admin access required.');
+    }
     return uid;
 }
 

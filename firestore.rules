@@ -1,47 +1,102 @@
 rules_version = '2';
 
-// NOTE: If your mobile app already deploys its own firestore.rules, merge the
-// blocks below into the existing file rather than replacing it. The admin +
-// broadcast rules here are additive.
+// Combined rules for mobile app + admin webapp.
+// Source of truth for admin status: users/{uid}.role == 'admin'
+// (No separate admins/ collection — we removed the webapp's parallel gate.)
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
+    function signedIn() {
       return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
     function isAdmin() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Admin gate doc. Users can only read their own doc (to check their own status).
-    // Writes are server-only (create admin docs via console or a trusted script).
-    match /admins/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
-      allow write: if false;
-    }
+    // ── Users ──────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read:           if isOwner(userId) || isAdmin();
+      allow create:         if isOwner(userId) || isAdmin();
+      allow update, delete: if isOwner(userId) || isAdmin();
 
-    // User profile docs. Owner can read/write own doc. Admins can read for targeting.
-    match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow create, update: if isSignedIn() && request.auth.uid == uid;
-      allow delete: if false;
-
-      // In-app notification inbox. Server-only writes; owner may read and mark readAt.
-      match /notifications/{notifId} {
-        allow read: if isSignedIn() && request.auth.uid == uid;
-        allow update: if isSignedIn()
-                      && request.auth.uid == uid
-                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt']);
-        allow create, delete: if false;
+      match /{subcollection=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
-    // Broadcast audit log. Admins read, server writes.
-    match /broadcasts/{id} {
-      allow read: if isAdmin();
+    // ── Providers ─────────────────────────────────────────────────────────
+    match /providers/{providerId} {
+      allow read:  if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Appointments ──────────────────────────────────────────────────────
+    match /appointments/{appointmentId} {
+      allow read:  if signedIn();
+      allow write: if signedIn();
+    }
+
+    // ── Content collections (published-or-admin read, admin-only write) ───
+    match /products/{productId} {
+      allow read:  if resource.data.active == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /videos/{videoId} {
+      allow read:  if resource.data.active == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /blogs/{blogId} {
+      allow read:  if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /podcasts/{podcastId} {
+      allow read:  if resource.data.active == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /testimonials/{testimonialId} {
+      allow read:  if resource.data.visible == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /learningMaterials/{materialId} {
+      allow read:  if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /activeExercises/{exerciseId} {
+      allow read:  if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Orders ────────────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow create: if signedIn()
+        && request.resource.data.customerId is string
+        && request.resource.data.customerId == request.auth.uid;
+      allow read:   if isAdmin()
+        || (signedIn()
+            && resource.data.customerId is string
+            && resource.data.customerId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Broadcasts (admin webapp → audit log of admin push notifications) ─
+    // Writes happen server-side through the sendAdminNotification Cloud
+    // Function (uses admin SDK → bypasses rules). Clients never write here.
+    match /broadcasts/{broadcastId} {
+      allow read:  if isAdmin();
       allow write: if false;
     }
   }
