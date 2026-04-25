@@ -241,8 +241,12 @@ export function AddLearningMaterial() {
         setImageError('');
         try {
             const { width, height } = await readImageDimensions(file);
-            if (width !== REQUIRED_IMAGE_WIDTH || height !== REQUIRED_IMAGE_HEIGHT) {
-                setImageError(`Image must be exactly ${REQUIRED_IMAGE_WIDTH} × ${REQUIRED_IMAGE_HEIGHT} pixels. Selected file is ${width} × ${height}.`);
+            const meetsMinSize = width >= REQUIRED_IMAGE_WIDTH && height >= REQUIRED_IMAGE_HEIGHT;
+            const targetRatio = REQUIRED_IMAGE_WIDTH / REQUIRED_IMAGE_HEIGHT;
+            const actualRatio = width / height;
+            const is16by9 = Math.abs(actualRatio - targetRatio) < 0.01;
+            if (!meetsMinSize && !is16by9) {
+                setImageError(`Image must be at least ${REQUIRED_IMAGE_WIDTH} × ${REQUIRED_IMAGE_HEIGHT}px or have a 16:9 aspect ratio. Selected file is ${width} × ${height}.`);
                 return;
             }
             setImageFile(file);
@@ -428,7 +432,7 @@ export function AddLearningMaterial() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg">Image *</CardTitle>
-                            <CardDescription>Upload an image exactly {REQUIRED_IMAGE_WIDTH} × {REQUIRED_IMAGE_HEIGHT} pixels.</CardDescription>
+                            <CardDescription>Upload an image at least {REQUIRED_IMAGE_WIDTH} × {REQUIRED_IMAGE_HEIGHT}px, or any 16:9 image.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {currentImage ? (
@@ -443,7 +447,7 @@ export function AddLearningMaterial() {
                                 <Label htmlFor="image-upload" className="w-full max-w-sm rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary flex flex-col items-center justify-center cursor-pointer transition-colors group p-8" style={{ aspectRatio: `${REQUIRED_IMAGE_WIDTH} / ${REQUIRED_IMAGE_HEIGHT}` }}>
                                     <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
                                     <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Upload image</span>
-                                    <span className="text-xs text-muted-foreground/70 mt-1">Required: {REQUIRED_IMAGE_WIDTH} × {REQUIRED_IMAGE_HEIGHT}px</span>
+                                    <span className="text-xs text-muted-foreground/70 mt-1">Min {REQUIRED_IMAGE_WIDTH} × {REQUIRED_IMAGE_HEIGHT}px or any 16:9 image</span>
                                     <input id="image-upload" type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
                                 </Label>
                             )}
