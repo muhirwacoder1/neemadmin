@@ -6,9 +6,11 @@ import {
     getLearningMaterial,
     updateLearningMaterial,
     uploadLearningContentImage,
+    uploadLearningImage,
     uploadLearningThumbnail,
     type LearningMaterial,
     type LearningMaterialCategory,
+    type LearningMaterialMediaType,
     type LearningMaterialVideoSource,
 } from '../../services/api';
 import { RichTextEditor } from '../../components/RichTextEditor';
@@ -20,10 +22,12 @@ import {
     Eye,
     EyeOff,
     Film,
+    Image as ImageIcon,
     Loader2,
     Pin,
     Save,
     Upload,
+    Video as VideoIcon,
     X,
     Youtube,
 } from 'lucide-react';
@@ -46,8 +50,27 @@ const CATEGORIES: LearningMaterialCategory[] = [
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
 
+const REQUIRED_IMAGE_WIDTH = 920;
+const REQUIRED_IMAGE_HEIGHT = 1020;
+
 function todayInputValue() {
     return new Date().toISOString().slice(0, 10);
+}
+
+function readImageDimensions(file: File): Promise<{ width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Could not read image dimensions.'));
+        };
+        img.src = url;
+    });
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -104,11 +127,18 @@ export function AddLearningMaterial() {
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
     const [cloudinaryMode, setCloudinaryMode] = useState<'url' | 'upload'>('url');
 
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState('');
+    const [existingImage, setExistingImage] = useState('');
+    const [imageError, setImageError] = useState('');
+
     const [form, setForm] = useState({
         title: '',
         category: 'Self Care' as LearningMaterialCategory,
+        mediaType: 'video' as LearningMaterialMediaType,
         videoSource: 'youtube' as LearningMaterialVideoSource,
         videoUrl: '',
+        imageUrl: '',
         body: '',
         status: 'draft' as 'published' | 'draft',
         publishDate: todayInputValue(),
@@ -123,8 +153,10 @@ export function AddLearningMaterial() {
             setForm({
                 title: material.title || '',
                 category: material.category || 'Self Care',
+                mediaType: material.mediaType || 'video',
                 videoSource: material.videoSource || 'youtube',
                 videoUrl: material.videoUrl || '',
+                imageUrl: material.imageUrl || '',
                 body: material.body || '',
                 status: material.status || 'draft',
                 publishDate: material.publishDate || todayInputValue(),
@@ -132,6 +164,7 @@ export function AddLearningMaterial() {
                 displayOrder: material.displayOrder ?? Date.now(),
             });
             setExistingThumbnail(material.thumbnailImage || '');
+            setExistingImage(material.imageUrl || '');
             if (material.videoSource === 'cloudinary') setCloudinaryMode('url');
         });
     }, [id, isEditing]);
@@ -201,17 +234,50 @@ export function AddLearningMaterial() {
         return uploadLearningContentImage(file, materialId);
     };
 
+    const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        setImageError('');
+        try {
+            const { width, height } = await readImageDimensions(file);
+            if (width !== REQUIRED_IMAGE_WIDTH || height !== REQUIRED_IMAGE_HEIGHT) {
+                setImageError(`Image must be exactly ${REQUIRED_IMAGE_WIDTH} × ${REQUIRED_IMAGE_HEIGHT} pixels. Selected file is ${width} × ${height}.`);
+                return;
+            }
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+            setExistingImage('');
+        } catch (err: any) {
+            setImageError(err?.message || 'Could not read image.');
+        }
+    };
+
+    const removeImage = () => {
+        setImageFile(null);
+        setImagePreview('');
+        setExistingImage('');
+        setImageError('');
+        setForm(prev => ({ ...prev, imageUrl: '' }));
+    };
+
+    const currentImage = existingImage || imagePreview;
+
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
 
         if (!form.title.trim()) { alert('Tip title is required.'); return; }
-        if (!form.videoUrl.trim()) { alert('Video URL is required.'); return; }
         if (!form.body.trim()) { alert('Written content is required.'); return; }
+        if (form.mediaType === 'video' && !form.videoUrl.trim()) { alert('Video URL is required.'); return; }
+        if (form.mediaType === 'image' && !imageFile && !existingImage) {
+            alert(`Please upload a ${REQUIRED_IMAGE_WIDTH} × ${REQUIRED_IMAGE_HEIGHT} image.`);
+            return;
+        }
 
         setLoading(true);
         try {
             let thumbnailImage = existingThumbnail;
-            if (!thumbnailImage && !thumbnailFile && form.videoSource === 'youtube') {
+            if (!thumbnailImage && !thumbnailFile && form.mediaType === 'video' && form.videoSource === 'youtube') {
                 const ytId = extractYouTubeId(form.videoUrl);
                 if (ytId) thumbnailImage = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
             }
@@ -219,6 +285,8 @@ export function AddLearningMaterial() {
             const data: Omit<LearningMaterial, 'id' | 'createdAt' | 'updatedAt'> = {
                 ...form,
                 thumbnailImage,
+                videoUrl: form.mediaType === 'video' ? form.videoUrl : '',
+                imageUrl: form.mediaType === 'image' ? (existingImage || form.imageUrl) : '',
             };
 
             let materialId: string;
@@ -228,12 +296,25 @@ export function AddLearningMaterial() {
                     thumbnailImage = await uploadLearningThumbnail(thumbnailFile, id);
                     data.thumbnailImage = thumbnailImage;
                 }
+                if (form.mediaType === 'image' && imageFile) {
+                    const imageUrl = await uploadLearningImage(imageFile, id);
+                    data.imageUrl = imageUrl;
+                    if (!thumbnailImage) data.thumbnailImage = imageUrl;
+                }
                 await updateLearningMaterial(id, data);
             } else {
                 materialId = await addLearningMaterial(data);
+                const followup: Partial<LearningMaterial> = {};
                 if (thumbnailFile) {
-                    thumbnailImage = await uploadLearningThumbnail(thumbnailFile, materialId);
-                    await updateLearningMaterial(materialId, { thumbnailImage });
+                    followup.thumbnailImage = await uploadLearningThumbnail(thumbnailFile, materialId);
+                }
+                if (form.mediaType === 'image' && imageFile) {
+                    const imageUrl = await uploadLearningImage(imageFile, materialId);
+                    followup.imageUrl = imageUrl;
+                    if (!thumbnailImage && !thumbnailFile) followup.thumbnailImage = imageUrl;
+                }
+                if (Object.keys(followup).length > 0) {
+                    await updateLearningMaterial(materialId, followup);
                 }
             }
 
@@ -318,6 +399,74 @@ export function AddLearningMaterial() {
                     </CardContent>
                 </Card>
 
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Media Type</CardTitle>
+                        <CardDescription>Choose whether this tip uses a video or a single image.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Button
+                                type="button"
+                                variant={form.mediaType === 'video' ? 'default' : 'outline'}
+                                onClick={() => setForm({ ...form, mediaType: 'video' })}
+                            >
+                                <VideoIcon className="w-4 h-4 mr-2" /> Video
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={form.mediaType === 'image' ? 'default' : 'outline'}
+                                onClick={() => setForm({ ...form, mediaType: 'image' })}
+                            >
+                                <ImageIcon className="w-4 h-4 mr-2" /> Image only
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {form.mediaType === 'image' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Image *</CardTitle>
+                            <CardDescription>Upload an image exactly {REQUIRED_IMAGE_WIDTH} × {REQUIRED_IMAGE_HEIGHT} pixels.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {currentImage ? (
+                                <div className="relative group w-full max-w-sm rounded-md overflow-hidden border" style={{ aspectRatio: `${REQUIRED_IMAGE_WIDTH} / ${REQUIRED_IMAGE_HEIGHT}` }}>
+                                    <img src={currentImage} alt="" className="w-full h-full object-cover" />
+                                    <Button type="button" variant="destructive" size="icon" onClick={removeImage}
+                                        className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Label htmlFor="image-upload" className="w-full max-w-sm rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-primary flex flex-col items-center justify-center cursor-pointer transition-colors group p-8" style={{ aspectRatio: `${REQUIRED_IMAGE_WIDTH} / ${REQUIRED_IMAGE_HEIGHT}` }}>
+                                    <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
+                                    <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Upload image</span>
+                                    <span className="text-xs text-muted-foreground/70 mt-1">Required: {REQUIRED_IMAGE_WIDTH} × {REQUIRED_IMAGE_HEIGHT}px</span>
+                                    <input id="image-upload" type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                                </Label>
+                            )}
+                            {currentImage && (
+                                <div>
+                                    <Label htmlFor="image-replace" className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium cursor-pointer">
+                                        <Upload className="w-4 h-4" />
+                                        <span>Replace image</span>
+                                        <input id="image-replace" type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                                    </Label>
+                                </div>
+                            )}
+                            {imageError && (
+                                <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                                    <p className="text-sm text-destructive">{imageError}</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {form.mediaType === 'video' && (
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Video</CardTitle>
@@ -431,6 +580,7 @@ export function AddLearningMaterial() {
                         )}
                     </CardContent>
                 </Card>
+                )}
 
                 <Card>
                     <CardHeader>

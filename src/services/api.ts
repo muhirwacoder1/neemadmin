@@ -475,14 +475,17 @@ export type LearningMaterialCategory =
     | 'Mental Health';
 export type LearningMaterialStatus = 'published' | 'draft';
 export type LearningMaterialVideoSource = 'youtube' | 'cloudinary';
+export type LearningMaterialMediaType = 'video' | 'image';
 
 export interface LearningMaterial {
     id?: string;
     title: string;
     category: LearningMaterialCategory;
     thumbnailImage: string;
+    mediaType?: LearningMaterialMediaType;
     videoSource: LearningMaterialVideoSource;
     videoUrl: string;
+    imageUrl?: string;
     body: string;
     status: LearningMaterialStatus;
     publishDate: string;
@@ -538,6 +541,12 @@ export async function reorderLearningMaterials(items: { id: string; displayOrder
 
 export async function uploadLearningThumbnail(file: File, materialId: string): Promise<string> {
     const storageRef = ref(storage, `learningMaterials/${materialId}/thumbnail_${Date.now()}_${file.name}`);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
+}
+
+export async function uploadLearningImage(file: File, materialId: string): Promise<string> {
+    const storageRef = ref(storage, `learningMaterials/${materialId}/image_${Date.now()}_${file.name}`);
     await uploadBytes(storageRef, file);
     return getDownloadURL(storageRef);
 }
