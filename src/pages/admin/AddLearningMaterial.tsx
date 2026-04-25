@@ -50,8 +50,8 @@ const CATEGORIES: LearningMaterialCategory[] = [
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
 
-const REQUIRED_IMAGE_WIDTH = 920;
-const REQUIRED_IMAGE_HEIGHT = 1020;
+const REQUIRED_IMAGE_WIDTH = 1920;
+const REQUIRED_IMAGE_HEIGHT = 1080;
 
 function todayInputValue() {
     return new Date().toISOString().slice(0, 10);
