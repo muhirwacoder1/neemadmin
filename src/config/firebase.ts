@@ -26,3 +26,8 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Dedicated bucket for video assets (source uploads + transcoded renditions).
+// Falls back to the default bucket if the env var is not set.
+export const VIDEO_BUCKET = import.meta.env.VITE_FIREBASE_VIDEO_BUCKET || '';
+export const videoStorage = VIDEO_BUCKET ? getStorage(app, VIDEO_BUCKET) : storage;

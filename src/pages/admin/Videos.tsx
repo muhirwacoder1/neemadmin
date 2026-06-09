@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getVideos, deleteVideo, type Video } from '../../services/api';
-import { Plus, Search, Pencil, Trash2, Film, Loader2, Youtube, Cloud, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Film, Loader2, Youtube, Cloud, HardDriveUpload, Eye, AlertCircle, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,6 +9,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+function extractYouTubeId(url: string): string | null {
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})|^([a-zA-Z0-9_-]{11})$/);
+    return m ? (m[1] || m[2]) : null;
+}
 
 const PER_PAGE = 10;
 
@@ -19,6 +25,7 @@ export function AdminVideos() {
     const [statusFilter, setStatusFilter] = useState('All');
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
+    const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -184,6 +191,8 @@ export function AdminVideos() {
                                             <div className="flex items-center gap-1.5 text-muted-foreground">
                                                 {video.videoSource === 'youtube' ? (
                                                     <><Youtube className="w-4 h-4 text-red-500" /><span className="text-xs">YouTube</span></>
+                                                ) : video.videoSource === 'firebase' ? (
+                                                    <><HardDriveUpload className="w-4 h-4 text-orange-500" /><span className="text-xs">Firebase</span></>
                                                 ) : (
                                                     <><Cloud className="w-4 h-4 text-blue-500" /><span className="text-xs">Cloudinary</span></>
                                                 )}
@@ -191,9 +200,17 @@ export function AdminVideos() {
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">{video.duration}</TableCell>
                                         <TableCell>
-                                            <Badge variant={video.active ? "default" : "secondary"}>
-                                                {video.active ? 'Active' : 'Inactive'}
-                                            </Badge>
+                                            {video.videoSource === 'firebase' && video.processingStatus && video.processingStatus !== 'ready' ? (
+                                                video.processingStatus === 'error' ? (
+                                                    <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" /> Failed</Badge>
+                                                ) : (
+                                                    <Badge variant="secondary" className="gap-1 text-blue-600"><Loader2 className="w-3 h-3 animate-spin" /> {video.processingStatus === 'uploading' ? 'Uploading' : 'Processing'}</Badge>
+                                                )
+                                            ) : (
+                                                <Badge variant={video.active ? "default" : "secondary"}>
+                                                    {video.active ? 'Active' : 'Inactive'}
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right pr-6">
                                             <DropdownMenu>
@@ -202,6 +219,9 @@ export function AdminVideos() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => setPreviewVideo(video)}>
+                                                        <Eye className="h-4 w-4 mr-2" /> Preview
+                                                    </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => navigate(`/admin/videos/edit/${video.id}`)}>
                                                         <Pencil className="h-4 w-4 mr-2" /> Edit Video
                                                     </DropdownMenuItem>
@@ -232,6 +252,43 @@ export function AdminVideos() {
                     </div>
                 )}
             </Card>
+
+            {/* Preview dialog */}
+            <Dialog open={!!previewVideo} onOpenChange={(open) => { if (!open) setPreviewVideo(null); }}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="truncate pr-6">{previewVideo?.title || 'Preview'}</DialogTitle>
+                    </DialogHeader>
+                    {previewVideo && (
+                        <div className="aspect-video w-full rounded-md overflow-hidden bg-black">
+                            {previewVideo.videoSource === 'youtube' ? (
+                                (() => {
+                                    const ytId = extractYouTubeId(previewVideo.videoUrl);
+                                    return ytId ? (
+                                        <iframe
+                                            className="w-full h-full"
+                                            src={`https://www.youtube.com/embed/${ytId}`}
+                                            title={previewVideo.title}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <div className="flex items-center justify-center h-full text-white text-sm">Invalid YouTube URL</div>
+                                    );
+                                })()
+                            ) : (previewVideo.playbackUrl || previewVideo.videoUrl) ? (
+                                <video className="w-full h-full" src={previewVideo.playbackUrl || previewVideo.videoUrl} controls autoPlay poster={previewVideo.thumbnail || undefined} />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-white text-sm">
+                                    {previewVideo.processingStatus === 'processing' || previewVideo.processingStatus === 'uploading'
+                                        ? 'Still processing…'
+                                        : 'No video available'}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

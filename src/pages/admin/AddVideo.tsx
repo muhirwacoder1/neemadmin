@@ -1,9 +1,12 @@
 /// <reference types="vite/client" />
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { addVideo, getVideo, updateVideo, uploadVideoThumbnail, type Video, type VideoCategory, type VideoSource } from '../../services/api';
+import {
+    addVideo, getVideo, updateVideo, uploadVideoThumbnail, uploadVideoResumable,
+    type Video, type VideoCategory, type VideoSource, type VideoUploadController,
+} from '../../services/api';
 import { RichTextEditor } from '../../components/RichTextEditor';
-import { ArrowLeft, Upload, Loader2, Save, X, Youtube, Cloud, Film, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Save, X, Youtube, Cloud, Film, CheckCircle, AlertCircle, HardDriveUpload, Pause, Play } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,6 +19,9 @@ const CATEGORIES: VideoCategory[] = ['General', 'Nutrition', 'Sports', 'Wellness
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || '';
 
+// Upload state shared by the Firebase + Cloudinary upload flows.
+type UploadState = 'idle' | 'uploading' | 'paused' | 'processing' | 'done' | 'error';
+
 function extractYouTubeId(url: string): string | null {
     const patterns = [
         /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
@@ -27,6 +33,14 @@ function extractYouTubeId(url: string): string | null {
     }
     return null;
 }
+
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const MAX_VIDEO_BYTES = 600 * 1024 * 1024; // mirrors the Storage rule limit
 
 async function uploadToCloudinary(
     file: File,
@@ -66,6 +80,19 @@ async function uploadToCloudinary(
     });
 }
 
+function storageErrorMessage(code: string): string {
+    switch (code) {
+        case 'storage/unauthorized':
+            return 'Permission denied. Make sure you are signed in as an admin (you may need to log out and back in to refresh permissions).';
+        case 'storage/retry-limit-exceeded':
+            return 'The connection is too unstable to finish the upload. Check your internet and retry.';
+        case 'storage/quota-exceeded':
+            return 'Storage quota exceeded.';
+        default:
+            return 'Upload failed. Check your connection and try again.';
+    }
+}
+
 export function AddVideo() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -76,17 +103,28 @@ export function AddVideo() {
     const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
     const [existingThumbnail, setExistingThumbnail] = useState<string>('');
 
-    // Cloudinary upload state
+    // Cloudinary URL/upload sub-mode
     const [cloudinaryMode, setCloudinaryMode] = useState<'url' | 'upload'>('url');
+
+    // Shared video-file upload state (Firebase + Cloudinary upload flows)
     const [videoFile, setVideoFile] = useState<File | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+    const [uploadStatus, setUploadStatus] = useState<UploadState>('idle');
+    const [uploadError, setUploadError] = useState('');
+
+    // The Firestore doc id backing a Firebase upload. For a brand-new video we
+    // create the doc up front (to get an id for the storage path); when editing
+    // we reuse the existing id.
+    const [firebaseDocId, setFirebaseDocId] = useState<string | null>(null);
+    const uploadCtrl = useRef<VideoUploadController | null>(null);
 
     const [form, setForm] = useState({
         title: '',
         description: '',
         category: 'General' as VideoCategory,
-        videoSource: 'youtube' as VideoSource,
+        // New videos default to Firebase Storage. Legacy youtube/cloudinary docs
+        // load their own source when editing.
+        videoSource: 'firebase' as VideoSource,
         videoUrl: '',
         duration: '',
         active: true,
@@ -109,12 +147,16 @@ export function AddVideo() {
                     if (v.videoSource === 'cloudinary' && v.videoUrl) {
                         setCloudinaryMode('url');
                     }
+                    if (v.videoSource === 'firebase') {
+                        setFirebaseDocId(id);
+                        if (v.videoUrl) setUploadStatus(v.processingStatus === 'ready' ? 'done' : 'processing');
+                    }
                 }
             });
         }
     }, [id, isEditing]);
 
-    // Auto-generate YouTube thumbnail when URL changes
+    // Auto-generate YouTube thumbnail when URL changes (legacy edit only)
     useEffect(() => {
         if (form.videoSource === 'youtube' && form.videoUrl && !thumbnailFile && !existingThumbnail) {
             const ytId = extractYouTubeId(form.videoUrl);
@@ -123,6 +165,16 @@ export function AddVideo() {
             }
         }
     }, [form.videoUrl, form.videoSource, thumbnailFile, existingThumbnail]);
+
+    // Cancel any in-flight upload if the component unmounts.
+    useEffect(() => {
+        return () => {
+            if (uploadCtrl.current && (uploadStatus === 'uploading' || uploadStatus === 'paused')) {
+                uploadCtrl.current.cancel();
+            }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleThumbnailAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -139,16 +191,114 @@ export function AddVideo() {
         setExistingThumbnail('');
     };
 
+    const resetUploadState = () => {
+        setVideoFile(null);
+        setUploadStatus('idle');
+        setUploadProgress(0);
+        setUploadError('');
+        uploadCtrl.current = null;
+    };
+
     const handleVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        if (file.size > MAX_VIDEO_BYTES) {
+            alert(`Video is too large (${formatBytes(file.size)}). Maximum is 600 MB.`);
+            e.target.value = '';
+            return;
+        }
         setVideoFile(file);
         setUploadStatus('idle');
         setUploadProgress(0);
-        setForm({ ...form, videoUrl: '' });
+        setUploadError('');
+        setForm(prev => ({ ...prev, videoUrl: '' }));
         e.target.value = '';
     };
 
+    const switchSource = (source: VideoSource) => {
+        if (uploadCtrl.current && (uploadStatus === 'uploading' || uploadStatus === 'paused')) {
+            uploadCtrl.current.cancel();
+        }
+        resetUploadState();
+        setForm(prev => ({ ...prev, videoSource: source, videoUrl: '' }));
+        if (source === 'cloudinary') setCloudinaryMode('url');
+    };
+
+    // ── Firebase resumable upload ──────────────────────────────
+    const ensureFirebaseDocId = async (): Promise<string> => {
+        if (firebaseDocId) return firebaseDocId;
+        if (isEditing && id) {
+            setFirebaseDocId(id);
+            return id;
+        }
+        // Create a placeholder doc (inactive until the form is submitted) so we
+        // have an id for the storage path videos/{id}/source/...
+        const newId = await addVideo({
+            title: form.title || 'Untitled video',
+            description: form.description,
+            category: form.category,
+            thumbnail: existingThumbnail || '',
+            videoSource: 'firebase',
+            videoUrl: '',
+            duration: form.duration,
+            active: false,
+            processingStatus: 'uploading',
+        });
+        setFirebaseDocId(newId);
+        return newId;
+    };
+
+    const handleFirebaseUpload = async () => {
+        if (!videoFile) return;
+        setUploadStatus('uploading');
+        setUploadProgress(0);
+        setUploadError('');
+        try {
+            const vid = await ensureFirebaseDocId();
+            uploadCtrl.current = uploadVideoResumable(videoFile, vid, {
+                onProgress: (percent) => setUploadProgress(percent),
+                onStateChange: (state) => {
+                    if (state === 'paused') setUploadStatus('paused');
+                    else if (state === 'running') setUploadStatus('uploading');
+                },
+                onError: (error) => {
+                    setUploadStatus('error');
+                    setUploadError(storageErrorMessage(error.code));
+                },
+                onComplete: async ({ downloadUrl, storagePath }) => {
+                    try {
+                        await updateVideo(vid, {
+                            videoSource: 'firebase',
+                            storagePath,
+                            videoUrl: downloadUrl,
+                            playbackUrl: downloadUrl,
+                            processingStatus: 'processing',
+                            fileSizeBytes: videoFile.size,
+                            originalFileName: videoFile.name,
+                        });
+                        setForm(prev => ({ ...prev, videoUrl: downloadUrl, videoSource: 'firebase' }));
+                        setUploadStatus('processing');
+                    } catch (e) {
+                        setUploadStatus('error');
+                        setUploadError('Uploaded, but failed to save the video record. Try saving again.');
+                    }
+                },
+            });
+        } catch (e: any) {
+            setUploadStatus('error');
+            setUploadError(e?.message || 'Failed to start upload.');
+        }
+    };
+
+    const pauseUpload = () => { uploadCtrl.current?.pause(); };
+    const resumeUpload = () => { uploadCtrl.current?.resume(); };
+    const cancelUpload = () => {
+        uploadCtrl.current?.cancel();
+        resetUploadState();
+        setForm(prev => ({ ...prev, videoUrl: '' }));
+    };
+
+    // ── Cloudinary upload ──────────────────────────────────────
     const handleCloudinaryUpload = async () => {
         if (!videoFile) return;
         if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
@@ -157,28 +307,31 @@ export function AddVideo() {
         }
         setUploadStatus('uploading');
         setUploadProgress(0);
+        setUploadError('');
         try {
             const url = await uploadToCloudinary(videoFile, setUploadProgress);
             setForm(prev => ({ ...prev, videoUrl: url }));
             setUploadStatus('done');
         } catch (err: any) {
             setUploadStatus('error');
-            alert('Cloudinary upload failed: ' + err.message);
+            setUploadError(err.message || 'Cloudinary upload failed');
         }
-    };
-
-    const removeVideoFile = () => {
-        setVideoFile(null);
-        setUploadStatus('idle');
-        setUploadProgress(0);
-        setForm({ ...form, videoUrl: '' });
     };
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (!form.title.trim()) { alert('Video title is required.'); return; }
+
+        const uploadIncomplete = uploadStatus === 'uploading' || uploadStatus === 'paused';
+        if (uploadIncomplete) {
+            alert('Please wait for the upload to finish (or cancel it) before saving.');
+            return;
+        }
+
         if (!form.videoUrl.trim()) {
-            if (form.videoSource === 'cloudinary' && cloudinaryMode === 'upload' && videoFile && uploadStatus !== 'done') {
+            if (form.videoSource === 'firebase') {
+                alert('Please upload a video file first.');
+            } else if (form.videoSource === 'cloudinary' && cloudinaryMode === 'upload' && videoFile && uploadStatus !== 'done') {
                 alert('Please upload the video to Cloudinary first.');
             } else {
                 alert('Video URL is required.');
@@ -189,32 +342,43 @@ export function AddVideo() {
         setLoading(true);
         try {
             let thumbnail = existingThumbnail;
+            let thumbnailPath: string | undefined;
 
-            // If YouTube and no custom thumbnail, use auto-generated
+            // Legacy YouTube: fall back to the auto-generated thumbnail.
             if (!thumbnail && !thumbnailFile && form.videoSource === 'youtube') {
                 const ytId = extractYouTubeId(form.videoUrl);
                 if (ytId) thumbnail = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
             }
 
-            const videoData: Omit<Video, 'id' | 'createdAt'> = {
-                ...form,
+            // For Firebase uploads we created/own a doc id; otherwise fall back
+            // to the editing id, or create a fresh doc (cloudinary/url path).
+            const effectiveId = firebaseDocId || (isEditing ? id! : null);
+
+            const videoData: Partial<Video> = {
+                title: form.title,
+                description: form.description,
+                category: form.category,
+                videoSource: form.videoSource,
+                videoUrl: form.videoUrl,
+                duration: form.duration,
+                active: form.active,
                 thumbnail,
             };
 
             let docId: string;
-            if (isEditing && id) {
-                docId = id;
+            if (effectiveId) {
+                docId = effectiveId;
                 if (thumbnailFile) {
-                    thumbnail = await uploadVideoThumbnail(thumbnailFile, id);
-                    videoData.thumbnail = thumbnail;
+                    const uploaded = await uploadVideoThumbnail(thumbnailFile, docId);
+                    thumbnail = uploaded.url;
+                    thumbnailPath = uploaded.path;
                 }
-                await updateVideo(id, videoData);
+                await updateVideo(docId, { ...videoData, thumbnail, ...(thumbnailPath ? { thumbnailPath } : {}) });
             } else {
-                videoData.thumbnail = thumbnail;
-                docId = await addVideo(videoData);
+                docId = await addVideo(videoData as Omit<Video, 'id' | 'createdAt'>);
                 if (thumbnailFile) {
-                    thumbnail = await uploadVideoThumbnail(thumbnailFile, docId);
-                    await updateVideo(docId, { thumbnail });
+                    const uploaded = await uploadVideoThumbnail(thumbnailFile, docId);
+                    await updateVideo(docId, { thumbnail: uploaded.url, thumbnailPath: uploaded.path });
                 }
             }
             navigate('/admin/videos');
@@ -247,7 +411,7 @@ export function AddVideo() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Thumbnail</CardTitle>
-                        <CardDescription>Upload a custom thumbnail or use the auto-generated one from YouTube.</CardDescription>
+                        <CardDescription>Upload a custom thumbnail. For Firebase videos one is auto-generated from the video if you skip this.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {currentThumbnail ? (
@@ -307,7 +471,7 @@ export function AddVideo() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="duration">Duration</Label>
-                                <Input id="duration" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} placeholder="e.g. 12 min" />
+                                <Input id="duration" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} placeholder="e.g. 12 min (auto-detected for Firebase uploads)" />
                             </div>
                         </div>
                     </CardContent>
@@ -317,53 +481,179 @@ export function AddVideo() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-lg">Video Source</CardTitle>
+                        <CardDescription>Upload to Firebase Storage (recommended) or use a Cloudinary video.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-5">
-                        {/* Source Toggle */}
-                        <div className="flex gap-3">
+                        {/* Source Toggle: Firebase | Cloudinary | YouTube */}
+                        <div className="flex flex-col sm:flex-row gap-3">
                             <Button
                                 type="button"
-                                variant={form.videoSource === 'youtube' ? "default" : "outline"}
-                                className={`flex-1 ${form.videoSource === 'youtube' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
-                                onClick={() => {
-                                    setForm({ ...form, videoSource: 'youtube', videoUrl: '' });
-                                    setVideoFile(null);
-                                    setUploadStatus('idle');
-                                }}
+                                variant={form.videoSource === 'firebase' ? 'default' : 'outline'}
+                                className={`flex-1 ${form.videoSource === 'firebase' ? 'bg-orange-600 hover:bg-orange-700 text-white' : ''}`}
+                                onClick={() => switchSource('firebase')}
                             >
-                                <Youtube className="w-5 h-5 mr-2" /> YouTube
+                                <HardDriveUpload className="w-5 h-5 mr-2" /> Firebase Upload
                             </Button>
                             <Button
                                 type="button"
-                                variant={form.videoSource === 'cloudinary' ? "default" : "outline"}
+                                variant={form.videoSource === 'cloudinary' ? 'default' : 'outline'}
                                 className={`flex-1 ${form.videoSource === 'cloudinary' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                                onClick={() => {
-                                    setForm({ ...form, videoSource: 'cloudinary', videoUrl: '' });
-                                    setCloudinaryMode('url');
-                                }}
+                                onClick={() => switchSource('cloudinary')}
                             >
                                 <Cloud className="w-5 h-5 mr-2" /> Cloudinary
                             </Button>
+                            <Button
+                                type="button"
+                                variant={form.videoSource === 'youtube' ? 'default' : 'outline'}
+                                className={`flex-1 ${form.videoSource === 'youtube' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
+                                onClick={() => switchSource('youtube')}
+                            >
+                                <Youtube className="w-5 h-5 mr-2" /> YouTube
+                            </Button>
                         </div>
 
-                        {/* YouTube: URL input */}
+                        {/* YouTube: URL input + detection */}
                         {form.videoSource === 'youtube' && (
                             <div className="space-y-2">
                                 <Label htmlFor="yt-url">YouTube URL *</Label>
-                                <Input id="yt-url" required value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} placeholder="https://www.youtube.com/watch?v=..." />
-                                <p className="text-[11px] text-muted-foreground">Paste the full YouTube video URL. Thumbnail will be auto-generated.</p>
+                                <Input
+                                    id="yt-url"
+                                    value={form.videoUrl}
+                                    onChange={e => setForm({ ...form, videoUrl: e.target.value })}
+                                    placeholder="https://www.youtube.com/watch?v=..."
+                                />
+                                <p className="text-[11px] text-muted-foreground">
+                                    Paste the full YouTube video URL. The thumbnail is auto-generated unless you upload a custom one above.
+                                </p>
+                                {form.videoUrl && (
+                                    extractYouTubeId(form.videoUrl) ? (
+                                        <div className="bg-muted/50 rounded-md p-3 flex items-center gap-3 border">
+                                            <Youtube className="w-5 h-5 text-red-500 shrink-0" />
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-foreground truncate">YouTube video detected</p>
+                                                <p className="text-xs text-muted-foreground truncate">ID: {extractYouTubeId(form.videoUrl)}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-destructive/10 border border-destructive/20 rounded-md p-3 flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+                                            <p className="text-xs text-destructive">Could not detect a valid YouTube video ID from this URL.</p>
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
+
+                        {/* Firebase: resumable file upload */}
+                        {form.videoSource === 'firebase' && (
+                            <div className="space-y-3">
+                                {/* File picker */}
+                                {!videoFile && uploadStatus !== 'processing' && uploadStatus !== 'done' && (
+                                    <Label htmlFor="video-upload" className="w-full rounded-md border-2 border-dashed py-8 flex flex-col items-center justify-center cursor-pointer transition-colors group border-muted-foreground/25 hover:border-primary">
+                                        <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
+                                        <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Select video file</span>
+                                        <span className="text-xs text-muted-foreground/70 mt-1">MP4, MOV, AVI, WebM · up to 600 MB</span>
+                                        <input id="video-upload" type="file" accept="video/*" onChange={handleVideoFileSelect} className="hidden" />
+                                    </Label>
+                                )}
+
+                                {videoFile && (
+                                    <div className="bg-muted/50 rounded-md p-4 space-y-3 border">
+                                        <div className="flex items-center gap-3">
+                                            <Film className="w-5 h-5 text-primary shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground truncate">{videoFile.name}</p>
+                                                <p className="text-xs text-muted-foreground">{formatBytes(videoFile.size)}</p>
+                                            </div>
+                                            {(uploadStatus === 'idle' || uploadStatus === 'error') && (
+                                                <Button type="button" variant="ghost" size="icon" onClick={cancelUpload} className="h-8 w-8 text-muted-foreground">
+                                                    <X className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {/* Progress bar */}
+                                        {(uploadStatus === 'uploading' || uploadStatus === 'paused') && (
+                                            <div>
+                                                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                                                    <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                                                </div>
+                                                <div className="flex items-center justify-between mt-1.5">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {uploadStatus === 'paused' ? 'Paused' : 'Uploading…'} {uploadProgress}%
+                                                    </p>
+                                                    <div className="flex items-center gap-2">
+                                                        {uploadStatus === 'uploading' ? (
+                                                            <Button type="button" size="sm" variant="secondary" onClick={pauseUpload}>
+                                                                <Pause className="w-3.5 h-3.5 mr-1" /> Pause
+                                                            </Button>
+                                                        ) : (
+                                                            <Button type="button" size="sm" variant="secondary" onClick={resumeUpload}>
+                                                                <Play className="w-3.5 h-3.5 mr-1" /> Resume
+                                                            </Button>
+                                                        )}
+                                                        <Button type="button" size="sm" variant="ghost" onClick={cancelUpload}>Cancel</Button>
+                                                    </div>
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-1">If your connection drops, the upload pauses and resumes automatically when it returns.</p>
+                                            </div>
+                                        )}
+
+                                        {uploadStatus === 'processing' && (
+                                            <div className="flex items-center gap-2 text-blue-600">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span className="text-xs font-medium">Uploaded. Optimizing for streaming… you can save now.</span>
+                                            </div>
+                                        )}
+
+                                        {uploadStatus === 'done' && (
+                                            <div className="flex items-center gap-2 text-emerald-600">
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span className="text-xs font-medium">Upload complete</span>
+                                            </div>
+                                        )}
+
+                                        {uploadStatus === 'error' && (
+                                            <div className="flex items-start gap-2 text-destructive">
+                                                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                                <span className="text-xs font-medium">{uploadError || 'Upload failed — try again.'}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Upload / Retry button */}
+                                        {(uploadStatus === 'idle' || uploadStatus === 'error') && (
+                                            <Button type="button" onClick={handleFirebaseUpload}>
+                                                <HardDriveUpload className="w-4 h-4 mr-2" />
+                                                {uploadStatus === 'error' ? 'Retry upload' : 'Upload to Firebase'}
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Already-uploaded notice when editing a firebase video with no new file */}
+                                {!videoFile && (uploadStatus === 'processing' || uploadStatus === 'done') && (
+                                    <div className="bg-primary/5 border border-primary/20 rounded-md p-3 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Film className="w-4 h-4 text-primary shrink-0" />
+                                            <p className="text-xs text-primary/90 truncate">A video is already attached. Select a file to replace it.</p>
+                                        </div>
+                                        <Label htmlFor="video-replace" className="text-xs text-primary font-medium cursor-pointer whitespace-nowrap">
+                                            Replace
+                                            <input id="video-replace" type="file" accept="video/*" onChange={handleVideoFileSelect} className="hidden" />
+                                        </Label>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Cloudinary: mode toggle + input */}
                         {form.videoSource === 'cloudinary' && (
                             <div className="space-y-4">
-                                {/* Sub-toggle: Paste URL or Upload File */}
                                 <div className="flex gap-2">
-                                    <Button type="button" size="sm" variant={cloudinaryMode === 'url' ? "default" : "secondary"} onClick={() => { setCloudinaryMode('url'); removeVideoFile(); }}>
+                                    <Button type="button" size="sm" variant={cloudinaryMode === 'url' ? 'default' : 'secondary'} onClick={() => { setCloudinaryMode('url'); resetUploadState(); }}>
                                         Paste URL
                                     </Button>
-                                    <Button type="button" size="sm" variant={cloudinaryMode === 'upload' ? "default" : "secondary"} onClick={() => { setCloudinaryMode('upload'); setForm({ ...form, videoUrl: '' }); }}>
+                                    <Button type="button" size="sm" variant={cloudinaryMode === 'upload' ? 'default' : 'secondary'} onClick={() => { setCloudinaryMode('upload'); setForm({ ...form, videoUrl: '' }); }}>
                                         Upload File
                                     </Button>
                                 </div>
@@ -371,7 +661,7 @@ export function AddVideo() {
                                 {cloudinaryMode === 'url' && (
                                     <div className="space-y-2">
                                         <Label htmlFor="cloud-url">Cloudinary Video URL *</Label>
-                                        <Input id="cloud-url" required={cloudinaryMode === 'url'} value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} placeholder="https://res.cloudinary.com/..." />
+                                        <Input id="cloud-url" value={form.videoUrl} onChange={e => setForm({ ...form, videoUrl: e.target.value })} placeholder="https://res.cloudinary.com/..." />
                                         <p className="text-[11px] text-muted-foreground">Paste the video URL from your Cloudinary dashboard.</p>
                                     </div>
                                 )}
@@ -384,49 +674,44 @@ export function AddVideo() {
                                                 <div>
                                                     <p className="text-sm font-medium text-destructive">Cloudinary not configured</p>
                                                     <p className="text-xs text-destructive/80 mt-1">
-                                                        Create a <code className="bg-background/80 px-1 rounded">.env</code> file in <code className="bg-background/80 px-1 rounded">webapp/</code> with:<br />
-                                                        <code className="bg-background/80 px-1 rounded text-[11px]">VITE_CLOUDINARY_CLOUD_NAME=your_cloud_name</code><br />
-                                                        <code className="bg-background/80 px-1 rounded text-[11px]">VITE_CLOUDINARY_UPLOAD_PRESET=your_preset</code>
+                                                        Set <code className="bg-background/80 px-1 rounded text-[11px]">VITE_CLOUDINARY_CLOUD_NAME</code> and <code className="bg-background/80 px-1 rounded text-[11px]">VITE_CLOUDINARY_UPLOAD_PRESET</code> in <code className="bg-background/80 px-1 rounded">.env</code>.
                                                     </p>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* File picker */}
                                         {!videoFile && (
-                                            <Label htmlFor="video-upload" className={`w-full rounded-md border-2 border-dashed py-8 flex flex-col items-center justify-center cursor-pointer transition-colors group ${
+                                            <Label htmlFor="cloud-video-upload" className={`w-full rounded-md border-2 border-dashed py-8 flex flex-col items-center justify-center cursor-pointer transition-colors group ${
                                                 cloudinaryConfigured ? 'border-muted-foreground/25 hover:border-primary' : 'border-muted-foreground/25 opacity-50 pointer-events-none'
                                             }`}>
                                                 <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mb-2" />
                                                 <span className="text-sm font-medium text-muted-foreground group-hover:text-primary">Select video file</span>
                                                 <span className="text-xs text-muted-foreground/70 mt-1">MP4, MOV, AVI, WebM</span>
-                                                <input id="video-upload" type="file" accept="video/*" onChange={handleVideoFileSelect} className="hidden" />
+                                                <input id="cloud-video-upload" type="file" accept="video/*" onChange={handleVideoFileSelect} className="hidden" />
                                             </Label>
                                         )}
 
-                                        {/* Selected file info */}
                                         {videoFile && (
                                             <div className="bg-muted/50 rounded-md p-4 space-y-3 border">
                                                 <div className="flex items-center gap-3">
                                                     <Film className="w-5 h-5 text-primary shrink-0" />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-medium text-foreground truncate">{videoFile.name}</p>
-                                                        <p className="text-xs text-muted-foreground">{(videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                                                        <p className="text-xs text-muted-foreground">{formatBytes(videoFile.size)}</p>
                                                     </div>
                                                     {uploadStatus !== 'uploading' && (
-                                                        <Button type="button" variant="ghost" size="icon" onClick={removeVideoFile} className="h-8 w-8 text-muted-foreground">
+                                                        <Button type="button" variant="ghost" size="icon" onClick={cancelUpload} className="h-8 w-8 text-muted-foreground">
                                                             <X className="w-4 h-4" />
                                                         </Button>
                                                     )}
                                                 </div>
 
-                                                {/* Progress bar */}
                                                 {uploadStatus === 'uploading' && (
                                                     <div>
                                                         <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
                                                             <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground mt-1.5">Uploading... {uploadProgress}%</p>
+                                                        <p className="text-xs text-muted-foreground mt-1.5">Uploading… {uploadProgress}%</p>
                                                     </div>
                                                 )}
 
@@ -438,13 +723,12 @@ export function AddVideo() {
                                                 )}
 
                                                 {uploadStatus === 'error' && (
-                                                    <div className="flex items-center gap-2 text-destructive">
-                                                        <AlertCircle className="w-4 h-4" />
-                                                        <span className="text-xs font-medium">Upload failed — try again</span>
+                                                    <div className="flex items-start gap-2 text-destructive">
+                                                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                                        <span className="text-xs font-medium">{uploadError || 'Upload failed — try again'}</span>
                                                     </div>
                                                 )}
 
-                                                {/* Upload button */}
                                                 {(uploadStatus === 'idle' || uploadStatus === 'error') && (
                                                     <Button type="button" onClick={handleCloudinaryUpload}>
                                                         <Cloud className="w-4 h-4 mr-2" /> Upload to Cloudinary
@@ -453,7 +737,6 @@ export function AddVideo() {
                                             </div>
                                         )}
 
-                                        {/* Show final URL if uploaded */}
                                         {uploadStatus === 'done' && form.videoUrl && (
                                             <div className="bg-primary/5 border border-primary/20 rounded-md p-3">
                                                 <p className="text-xs text-primary font-medium mb-1">Video URL (auto-filled):</p>
@@ -462,17 +745,6 @@ export function AddVideo() {
                                         )}
                                     </div>
                                 )}
-                            </div>
-                        )}
-
-                        {/* YouTube preview */}
-                        {form.videoUrl && form.videoSource === 'youtube' && extractYouTubeId(form.videoUrl) && (
-                            <div className="bg-muted/50 rounded-md p-4 flex items-center gap-3 border">
-                                <Film className="w-5 h-5 text-red-500 shrink-0" />
-                                <div className="min-w-0">
-                                    <p className="text-sm font-medium text-foreground truncate">YouTube Video Detected</p>
-                                    <p className="text-xs text-muted-foreground truncate">ID: {extractYouTubeId(form.videoUrl)}</p>
-                                </div>
                             </div>
                         )}
                     </CardContent>
@@ -498,10 +770,10 @@ export function AddVideo() {
                 <Card>
                     <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6">
                         <div className="flex items-center space-x-2">
-                            <Switch 
-                                id="active" 
-                                checked={form.active} 
-                                onCheckedChange={checked => setForm({ ...form, active: checked })} 
+                            <Switch
+                                id="active"
+                                checked={form.active}
+                                onCheckedChange={checked => setForm({ ...form, active: checked })}
                             />
                             <Label htmlFor="active" className="cursor-pointer">Video is active and visible to users</Label>
                         </div>

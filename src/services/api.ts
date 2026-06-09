@@ -3,9 +3,12 @@ import {
     query, orderBy, where, serverTimestamp, getDoc, writeBatch,
     type Timestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import {
+    ref, uploadBytes, getDownloadURL, uploadBytesResumable,
+    deleteObject, listAll, type UploadTask, type StorageError,
+} from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, db, storage } from '../config/firebase';
+import { auth, db, storage, videoStorage } from '../config/firebase';
 
 // ── Types ──────────────────────────────────────────────────────────
 export interface Provider {
@@ -367,7 +370,15 @@ export async function updateOrderStatus(id: string, status: Exclude<OrderStatus,
 
 // ── Video CRUD ─────────────────────────────────────────────────
 export type VideoCategory = 'General' | 'Nutrition' | 'Sports' | 'Wellness';
-export type VideoSource = 'cloudinary' | 'youtube';
+export type VideoSource = 'cloudinary' | 'youtube' | 'firebase';
+export type VideoProcessingStatus = 'uploading' | 'processing' | 'ready' | 'error';
+
+export interface VideoRendition {
+    quality: string;       // e.g. '480p', '720p'
+    url: string;
+    path: string;
+    width?: number;
+}
 
 export interface Video {
     id?: string;
@@ -380,6 +391,15 @@ export interface Video {
     duration: string;
     active: boolean;
     createdAt?: Timestamp;
+    // Firebase-hosted video fields (populated for videoSource === 'firebase')
+    storagePath?: string;            // source object: videos/{id}/source/<file>
+    playbackUrl?: string;            // optimized URL the app plays (rendition if ready, else source)
+    renditions?: VideoRendition[];
+    processingStatus?: VideoProcessingStatus;
+    processingError?: string;
+    fileSizeBytes?: number;
+    thumbnailPath?: string;          // storage path of the thumbnail (for cleanup)
+    originalFileName?: string;
 }
 
 const videosRef = collection(db, 'videos');
@@ -406,13 +426,103 @@ export async function updateVideo(id: string, data: Partial<Video>): Promise<voi
 }
 
 export async function deleteVideo(id: string): Promise<void> {
+    // Remove the Firestore doc first (the user-visible record), then best-effort
+    // clean up any Storage objects under videos/{id}/ so we don't orphan files.
     await deleteDoc(doc(db, 'videos', id));
+    try {
+        const folderRef = ref(videoStorage, `videos/${id}`);
+        const listing = await listAll(folderRef);
+        // Delete files in this folder and one level of subfolders (source/,
+        // renditions/, thumbnail/).
+        const fileDeletes = listing.items.map(item => deleteObject(item).catch(() => {}));
+        const subfolderDeletes = listing.prefixes.map(async prefix => {
+            const sub = await listAll(prefix);
+            await Promise.all(sub.items.map(item => deleteObject(item).catch(() => {})));
+        });
+        await Promise.all([...fileDeletes, ...subfolderDeletes]);
+    } catch (err) {
+        // Storage cleanup is best-effort; the doc is already gone.
+        console.warn('Video storage cleanup failed for', id, err);
+    }
 }
 
-export async function uploadVideoThumbnail(file: File, videoId: string): Promise<string> {
-    const storageRef = ref(storage, `videos/${videoId}/${file.name}`);
+export async function uploadVideoThumbnail(
+    file: File,
+    videoId: string,
+): Promise<{ url: string; path: string }> {
+    const path = `videos/${videoId}/thumbnail/${file.name}`;
+    const storageRef = ref(videoStorage, path);
     await uploadBytes(storageRef, file);
-    return getDownloadURL(storageRef);
+    const url = await getDownloadURL(storageRef);
+    return { url, path };
+}
+
+// ── Resumable video upload (Firebase Storage) ──────────────────
+export interface VideoUploadHandlers {
+    onProgress?: (percent: number, bytesTransferred: number, totalBytes: number) => void;
+    onStateChange?: (state: 'running' | 'paused' | 'success' | 'canceled' | 'error') => void;
+    onError?: (error: StorageError) => void;
+    onComplete?: (result: { downloadUrl: string; storagePath: string }) => void;
+}
+
+export interface VideoUploadController {
+    task: UploadTask;
+    storagePath: string;
+    pause: () => boolean;
+    resume: () => boolean;
+    cancel: () => boolean;
+}
+
+/**
+ * Upload a video file to the dedicated video bucket using a resumable upload.
+ * The Firebase SDK automatically retries transient network failures while the
+ * task stays alive, so progress is preserved across short connection drops.
+ * Returns a controller exposing pause/resume/cancel.
+ */
+export function uploadVideoResumable(
+    file: File,
+    videoId: string,
+    handlers: VideoUploadHandlers = {},
+): VideoUploadController {
+    const storagePath = `videos/${videoId}/source/${file.name}`;
+    const storageRef = ref(videoStorage, storagePath);
+    const task = uploadBytesResumable(storageRef, file, {
+        contentType: file.type || 'video/mp4',
+    });
+
+    task.on(
+        'state_changed',
+        snapshot => {
+            const percent = snapshot.totalBytes
+                ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
+                : 0;
+            handlers.onProgress?.(percent, snapshot.bytesTransferred, snapshot.totalBytes);
+            if (snapshot.state === 'running') handlers.onStateChange?.('running');
+            else if (snapshot.state === 'paused') handlers.onStateChange?.('paused');
+        },
+        error => {
+            // 'storage/canceled' is a deliberate cancel, not a failure.
+            if (error.code === 'storage/canceled') {
+                handlers.onStateChange?.('canceled');
+            } else {
+                handlers.onStateChange?.('error');
+                handlers.onError?.(error);
+            }
+        },
+        async () => {
+            handlers.onStateChange?.('success');
+            const downloadUrl = await getDownloadURL(task.snapshot.ref);
+            handlers.onComplete?.({ downloadUrl, storagePath });
+        },
+    );
+
+    return {
+        task,
+        storagePath,
+        pause: () => task.pause(),
+        resume: () => task.resume(),
+        cancel: () => task.cancel(),
+    };
 }
 
 // ── Blog CRUD ──────────────────────────────────────────────────
