@@ -24,6 +24,7 @@ import { AdminActiveExercises } from './pages/admin/ActiveExercises';
 import { AddActiveExercise } from './pages/admin/AddActiveExercise';
 import { AdminPatients } from './pages/admin/Patients';
 import { AdminPatientInfo } from './pages/admin/PatientInfo';
+import { AdminVitals } from './pages/admin/Vitals';
 import { PhysicianDashboard } from './pages/physician/Dashboard';
 import { PhysicianAppointments } from './pages/physician/Appointments';
 import { PhysicianProfile } from './pages/physician/Profile';
@@ -111,6 +112,7 @@ export default function App() {
                     <Route path="/admin/providers/edit/:id" element={<AddProvider />} />
                     <Route path="/admin/patients" element={<AdminPatients />} />
                     <Route path="/admin/patients/:id" element={<AdminPatientInfo />} />
+                    <Route path="/admin/vitals" element={<AdminVitals />} />
                     <Route path="/admin/appointments" element={<AdminAppointments />} />
                     <Route path="/admin/products" element={<AdminProducts />} />
                     <Route path="/admin/products/add" element={<AddProduct />} />

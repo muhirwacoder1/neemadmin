@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-    LayoutDashboard, Users, CalendarCheck, UserCircle, LogOut, Stethoscope, ShoppingBag, Video, FileText, Mic, BookOpen, Activity, PackageCheck, Star, Megaphone,
+    LayoutDashboard, Users, CalendarCheck, UserCircle, LogOut, Stethoscope, ShoppingBag, Video, FileText, Mic, BookOpen, Activity, PackageCheck, Star, Megaphone, HeartPulse,
 } from 'lucide-react';
 import {
     Sidebar,
@@ -36,6 +36,7 @@ export function AppSidebar() {
         { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
         { to: '/admin/providers', icon: Users, label: 'Providers' },
         { to: '/admin/patients', icon: UserCircle, label: 'Patients' },
+        { to: '/admin/vitals', icon: HeartPulse, label: 'Vitals' },
         { to: '/admin/products', icon: ShoppingBag, label: 'Products' },
         { to: '/admin/orders', icon: PackageCheck, label: 'Orders' },
         { to: '/admin/testimonials', icon: Star, label: 'Testimonials' },

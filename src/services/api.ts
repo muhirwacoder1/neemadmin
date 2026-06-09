@@ -1,7 +1,7 @@
 import {
     collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
     query, orderBy, where, serverTimestamp, getDoc, writeBatch,
-    type Timestamp,
+    limit, type Timestamp,
 } from 'firebase/firestore';
 import {
     ref, uploadBytes, getDownloadURL, uploadBytesResumable,
@@ -162,6 +162,30 @@ export interface PatientRecord {
     profile?: PatientProfileData;
 }
 
+export interface GlucoseReading {
+    id?: string;
+    value?: number;
+    unit?: string;
+    mealTiming?: string;
+    notes?: string | null;
+    timestamp?: Timestamp;
+}
+
+export interface BloodPressureReading {
+    id?: string;
+    systolic?: number;
+    diastolic?: number;
+    notes?: string | null;
+    timestamp?: Timestamp;
+}
+
+export interface PatientVitalsRecord {
+    patient: PatientRecord;
+    bmi: number | null;
+    latestGlucose: GlucoseReading | null;
+    latestBloodPressure: BloodPressureReading | null;
+}
+
 // ── Provider CRUD ──────────────────────────────────────────────────
 const usersRef = collection(db, 'users');
 const providersRef = collection(db, 'providers');
@@ -178,6 +202,45 @@ export async function getPatient(uid: string): Promise<PatientRecord | null> {
     const snap = await getDoc(doc(db, 'users', uid));
     if (!snap.exists()) return null;
     return { id: snap.id, ...snap.data() } as PatientRecord;
+}
+
+async function getLatestPatientMetric<T>(uid: string, metric: 'glucose' | 'bloodPressure'): Promise<T | null> {
+    const q = query(
+        collection(db, 'users', uid, metric),
+        orderBy('timestamp', 'desc'),
+        limit(1),
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as T;
+}
+
+function calculatePatientBmi(patient: PatientRecord): number | null {
+    const heightCm = patient.profile?.height;
+    const weightKg = patient.profile?.weight;
+    if (!heightCm || !weightKg || heightCm <= 0 || weightKg <= 0) return null;
+
+    const heightM = heightCm / 100;
+    return weightKg / (heightM * heightM);
+}
+
+export async function getPatientVitals(): Promise<PatientVitalsRecord[]> {
+    const patients = await getPatients();
+
+    return Promise.all(patients.map(async (patient) => {
+        const uid = patient.id || patient.uid;
+        const [latestGlucose, latestBloodPressure] = await Promise.all([
+            getLatestPatientMetric<GlucoseReading>(uid, 'glucose'),
+            getLatestPatientMetric<BloodPressureReading>(uid, 'bloodPressure'),
+        ]);
+
+        return {
+            patient,
+            bmi: calculatePatientBmi(patient),
+            latestGlucose,
+            latestBloodPressure,
+        };
+    }));
 }
 
 export async function getProviders(): Promise<Provider[]> {
