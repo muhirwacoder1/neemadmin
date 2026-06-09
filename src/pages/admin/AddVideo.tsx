@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-    addVideo, getVideo, updateVideo, uploadVideoThumbnail, uploadVideoResumable,
+    addVideo, ensureCurrentUserAdminClaim, getVideo, updateVideo, uploadVideoThumbnail, uploadVideoResumable,
     type Video, type VideoCategory, type VideoSource, type VideoUploadController,
 } from '../../services/api';
 import { RichTextEditor } from '../../components/RichTextEditor';
@@ -83,7 +83,7 @@ async function uploadToCloudinary(
 function storageErrorMessage(code: string): string {
     switch (code) {
         case 'storage/unauthorized':
-            return 'Permission denied. Make sure you are signed in as an admin (you may need to log out and back in to refresh permissions).';
+            return 'Permission denied. Your admin upload permission is not active yet. Click Retry upload to refresh permissions, or log out and back in.';
         case 'storage/retry-limit-exceeded':
             return 'The connection is too unstable to finish the upload. Check your internet and retry.';
         case 'storage/quota-exceeded':
@@ -91,6 +91,20 @@ function storageErrorMessage(code: string): string {
         default:
             return 'Upload failed. Check your connection and try again.';
     }
+}
+
+function adminClaimErrorMessage(error: any): string {
+    const code = error?.code || '';
+    if (code.includes('functions/not-found')) {
+        return 'Admin permission refresh is not deployed yet. Deploy the backfillAdminClaims Cloud Function, then retry upload.';
+    }
+    if (code.includes('functions/permission-denied')) {
+        return 'Your Firestore user is not allowed to refresh admin permissions. Make sure users/{uid}.role is admin.';
+    }
+    if (code.includes('functions/unauthenticated')) {
+        return 'You must be signed in as an admin before uploading videos.';
+    }
+    return error?.message || 'Failed to refresh admin upload permissions.';
 }
 
 export function AddVideo() {
@@ -254,6 +268,7 @@ export function AddVideo() {
         setUploadProgress(0);
         setUploadError('');
         try {
+            await ensureCurrentUserAdminClaim();
             const vid = await ensureFirebaseDocId();
             uploadCtrl.current = uploadVideoResumable(videoFile, vid, {
                 onProgress: (percent) => setUploadProgress(percent),
@@ -286,7 +301,7 @@ export function AddVideo() {
             });
         } catch (e: any) {
             setUploadStatus('error');
-            setUploadError(e?.message || 'Failed to start upload.');
+            setUploadError(adminClaimErrorMessage(e));
         }
     };
 

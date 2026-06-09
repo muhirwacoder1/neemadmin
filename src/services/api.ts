@@ -7,6 +7,7 @@ import {
     ref, uploadBytes, getDownloadURL, uploadBytesResumable,
     deleteObject, listAll, type UploadTask, type StorageError,
 } from 'firebase/storage';
+import { getIdTokenResult } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth, db, storage, videoStorage } from '../config/firebase';
 
@@ -344,6 +345,24 @@ export async function createPhysicianAccount(data: {
 export async function resetPhysicianPassword(email: string, newPassword: string): Promise<void> {
     const callable = httpsCallable(functions, 'resetPhysicianPassword');
     await callable({ email, newPassword });
+}
+
+export async function ensureCurrentUserAdminClaim(): Promise<void> {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+        throw new Error('You must be signed in before uploading videos.');
+    }
+
+    const currentToken = await getIdTokenResult(currentUser);
+    if (currentToken.claims.admin === true) return;
+
+    const callable = httpsCallable(functions, 'backfillAdminClaims');
+    await callable();
+
+    const refreshedToken = await getIdTokenResult(currentUser, true);
+    if (refreshedToken.claims.admin !== true) {
+        throw new Error('Admin role was found, but your login token has not refreshed yet. Log out and back in, then retry upload.');
+    }
 }
 
 // ── Product CRUD ────────────────────────────────────────────────
