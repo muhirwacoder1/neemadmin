@@ -12,6 +12,7 @@ import {
     Edit3,
     GripVertical,
     MoreHorizontal,
+    Package,
     Pin,
     Plus,
     Search,
@@ -83,6 +84,7 @@ export function AdminLearningMaterials() {
 
     const publishedCount = materials.filter(item => item.status === 'published').length;
     const featuredCount = materials.filter(item => item.featured).length;
+    const recipeCount = materials.filter(item => item.contentType === 'recipe' || item.category === 'Recipes').length;
 
     const handleDelete = async (id: string, title: string) => {
         if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -149,15 +151,15 @@ export function AdminLearningMaterials() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Learning Materials</h1>
-                    <p className="text-muted-foreground mt-1">Manage Learn Hub tips, videos, and article content.</p>
+                    <p className="text-muted-foreground mt-1">Manage Learn Hub tips, recipes, videos, and article content.</p>
                 </div>
                 <Button onClick={() => navigate('/admin/learning/add')}>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Tip
+                    Add Content
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Total Tips</CardTitle>
@@ -178,6 +180,13 @@ export function AdminLearningMaterials() {
                         <Pin className="h-4 w-4 text-amber-500" />
                     </CardHeader>
                     <CardContent><div className="text-2xl font-bold">{featuredCount}</div></CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Recipes</CardTitle>
+                        <Package className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent><div className="text-2xl font-bold">{recipeCount}</div></CardContent>
                 </Card>
             </div>
 
@@ -262,7 +271,9 @@ export function AdminLearningMaterials() {
                                                 )}
                                                 <div className="min-w-0">
                                                     <p className="text-sm font-medium truncate">{item.title}</p>
-                                                    <p className="text-xs text-muted-foreground truncate">{item.videoSource === 'youtube' ? 'YouTube' : 'Uploaded video'}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">
+                                                        {item.contentType === 'recipe' ? 'Recipe' : 'Learning tip'} · {item.videoSource === 'youtube' ? 'YouTube' : 'Uploaded video'}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </TableCell>

@@ -48,6 +48,7 @@ export function AddProduct() {
         badges: [] as ProductBadge[],
         deliveryDays: 3,
         active: true,
+        inStock: true,
     });
 
     useEffect(() => {
@@ -66,6 +67,7 @@ export function AddProduct() {
                         badges: p.badges || [],
                         deliveryDays: p.deliveryDays || 3,
                         active: p.active ?? true,
+                        inStock: p.inStock ?? true,
                     });
                     setExistingImages(p.images || []);
                 }
@@ -392,6 +394,14 @@ export function AddProduct() {
                                 onCheckedChange={checked => setForm({ ...form, active: checked })} 
                             />
                             <Label htmlFor="active" className="cursor-pointer">Product is active and visible in the store</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="inStock"
+                                checked={form.inStock}
+                                onCheckedChange={checked => setForm({ ...form, inStock: checked })}
+                            />
+                            <Label htmlFor="inStock" className="cursor-pointer">Product is in stock and can be bought from recipes</Label>
                         </div>
                         <Button type="submit" disabled={loading} className="w-full sm:w-auto">
                             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}

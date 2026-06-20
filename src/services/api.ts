@@ -55,6 +55,7 @@ export interface Product {
     reviewCount: number;
     deliveryDays: number;
     active: boolean;
+    inStock?: boolean;
     createdAt?: Timestamp;
 }
 
@@ -661,6 +662,7 @@ export async function uploadBlogImage(file: File, blogId: string): Promise<strin
 export type LearningMaterialCategory =
     | 'Diabetes 101'
     | 'Nutrition'
+    | 'Recipes'
     | 'Self Care'
     | 'Medication'
     | 'Exercise'
@@ -668,17 +670,25 @@ export type LearningMaterialCategory =
 export type LearningMaterialStatus = 'published' | 'draft';
 export type LearningMaterialVideoSource = 'youtube' | 'cloudinary';
 export type LearningMaterialMediaType = 'video' | 'image';
+export type LearningMaterialContentType = 'tip' | 'recipe';
+export interface LearningMaterialIngredient {
+    productId: string;
+    productName: string;
+    quantity: number;
+}
 
 export interface LearningMaterial {
     id?: string;
     title: string;
     category: LearningMaterialCategory;
+    contentType?: LearningMaterialContentType;
     thumbnailImage: string;
     mediaType?: LearningMaterialMediaType;
     videoSource: LearningMaterialVideoSource;
     videoUrl: string;
     imageUrl?: string;
     body: string;
+    recipeIngredients?: LearningMaterialIngredient[];
     status: LearningMaterialStatus;
     publishDate: string;
     featured: boolean;

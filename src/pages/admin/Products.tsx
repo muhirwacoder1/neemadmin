@@ -130,13 +130,14 @@ export function AdminProducts() {
                                 <TableHead className="h-10 text-right pr-4">Price</TableHead>
                                 <TableHead className="h-10">Features</TableHead>
                                 <TableHead className="h-10">Status</TableHead>
+                                <TableHead className="h-10">Stock</TableHead>
                                 <TableHead className="h-10 text-right pr-6">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {paginated.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-32 text-center border-b-0">
+                                    <TableCell colSpan={6} className="h-32 text-center border-b-0">
                                         <div className="flex flex-col items-center justify-center">
                                             <Package className="h-8 w-8 text-muted-foreground mb-2" />
                                             <span className="text-muted-foreground font-medium">No products found.</span>
@@ -173,6 +174,11 @@ export function AdminProducts() {
                                         <TableCell>
                                             <Badge variant={product.active ? "default" : "secondary"}>
                                                 {product.active ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={product.inStock === false ? "secondary" : "default"}>
+                                                {product.inStock === false ? 'Out of stock' : 'In stock'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right pr-6">

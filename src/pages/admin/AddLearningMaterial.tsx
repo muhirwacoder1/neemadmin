@@ -4,19 +4,24 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
     addLearningMaterial,
     getLearningMaterial,
+    getProducts,
     updateLearningMaterial,
     uploadLearningContentImage,
     uploadLearningImage,
     uploadLearningThumbnail,
     type LearningMaterial,
     type LearningMaterialCategory,
+    type LearningMaterialContentType,
+    type LearningMaterialIngredient,
     type LearningMaterialMediaType,
     type LearningMaterialVideoSource,
+    type Product,
 } from '../../services/api';
 import { RichTextEditor } from '../../components/RichTextEditor';
 import {
     AlertCircle,
     ArrowLeft,
+    BookOpen,
     CheckCircle,
     Cloud,
     Eye,
@@ -24,7 +29,9 @@ import {
     Film,
     Image as ImageIcon,
     Loader2,
+    Package,
     Pin,
+    Plus,
     Save,
     Upload,
     Video as VideoIcon,
@@ -41,6 +48,7 @@ import { Label } from '@/components/ui/label';
 const CATEGORIES: LearningMaterialCategory[] = [
     'Diabetes 101',
     'Nutrition',
+    'Recipes',
     'Self Care',
     'Medication',
     'Exercise',
@@ -131,15 +139,19 @@ export function AddLearningMaterial() {
     const [imagePreview, setImagePreview] = useState('');
     const [existingImage, setExistingImage] = useState('');
     const [imageError, setImageError] = useState('');
+    const [products, setProducts] = useState<Product[]>([]);
+    const [productSearch, setProductSearch] = useState('');
 
     const [form, setForm] = useState({
         title: '',
         category: 'Self Care' as LearningMaterialCategory,
+        contentType: 'tip' as LearningMaterialContentType,
         mediaType: 'video' as LearningMaterialMediaType,
         videoSource: 'youtube' as LearningMaterialVideoSource,
         videoUrl: '',
         imageUrl: '',
         body: '',
+        recipeIngredients: [] as LearningMaterialIngredient[],
         status: 'draft' as 'published' | 'draft',
         publishDate: todayInputValue(),
         featured: false,
@@ -153,11 +165,13 @@ export function AddLearningMaterial() {
             setForm({
                 title: material.title || '',
                 category: material.category || 'Self Care',
+                contentType: material.contentType || (material.recipeIngredients?.length ? 'recipe' : 'tip'),
                 mediaType: material.mediaType || 'video',
                 videoSource: material.videoSource || 'youtube',
                 videoUrl: material.videoUrl || '',
                 imageUrl: material.imageUrl || '',
                 body: material.body || '',
+                recipeIngredients: material.recipeIngredients || [],
                 status: material.status || 'draft',
                 publishDate: material.publishDate || todayInputValue(),
                 featured: !!material.featured,
@@ -168,6 +182,20 @@ export function AddLearningMaterial() {
             if (material.videoSource === 'cloudinary') setCloudinaryMode('url');
         });
     }, [id, isEditing]);
+
+    useEffect(() => {
+        let cancelled = false;
+        getProducts()
+            .then(items => {
+                if (!cancelled) {
+                    setProducts([...items].sort((a, b) => a.name.localeCompare(b.name)));
+                }
+            })
+            .catch(error => {
+                console.error('Could not load products for recipe ingredients:', error);
+            });
+        return () => { cancelled = true; };
+    }, []);
 
     useEffect(() => {
         if (form.videoSource !== 'youtube' || !form.videoUrl || thumbnailFile || existingThumbnail) return;
@@ -265,6 +293,48 @@ export function AddLearningMaterial() {
     };
 
     const currentImage = existingImage || imagePreview;
+    const selectedProductIds = new Set(form.recipeIngredients.map(item => item.productId));
+    const ingredientSearch = productSearch.trim().toLowerCase();
+    const ingredientOptions = products.filter(product => {
+        if (!ingredientSearch) return true;
+        return product.name.toLowerCase().includes(ingredientSearch);
+    });
+
+    const setContentType = (contentType: LearningMaterialContentType) => {
+        setForm(prev => ({
+            ...prev,
+            contentType,
+            category: contentType === 'recipe' && prev.category !== 'Recipes' ? 'Recipes' : prev.category,
+        }));
+    };
+
+    const addIngredient = (product: Product) => {
+        if (!product.id || selectedProductIds.has(product.id)) return;
+        setForm(prev => ({
+            ...prev,
+            recipeIngredients: [
+                ...prev.recipeIngredients,
+                { productId: product.id!, productName: product.name, quantity: 1 },
+            ],
+        }));
+    };
+
+    const removeIngredient = (productId: string) => {
+        setForm(prev => ({
+            ...prev,
+            recipeIngredients: prev.recipeIngredients.filter(item => item.productId !== productId),
+        }));
+    };
+
+    const updateIngredientQuantity = (productId: string, quantity: number) => {
+        const safeQuantity = Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
+        setForm(prev => ({
+            ...prev,
+            recipeIngredients: prev.recipeIngredients.map(item =>
+                item.productId === productId ? { ...item, quantity: safeQuantity } : item,
+            ),
+        }));
+    };
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -290,6 +360,7 @@ export function AddLearningMaterial() {
                 thumbnailImage,
                 videoUrl: form.mediaType === 'video' ? form.videoUrl : '',
                 imageUrl: form.mediaType === 'image' ? (existingImage || form.imageUrl) : '',
+                recipeIngredients: form.contentType === 'recipe' ? form.recipeIngredients : [],
             };
 
             let materialId: string;
@@ -401,6 +472,130 @@ export function AddLearningMaterial() {
                         </div>
                     </CardContent>
                 </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Content Type</CardTitle>
+                        <CardDescription>Recipes can include marketplace ingredients that users buy in one step.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Button
+                                type="button"
+                                variant={form.contentType === 'tip' ? 'default' : 'outline'}
+                                onClick={() => setContentType('tip')}
+                            >
+                                <BookOpen className="w-4 h-4 mr-2" /> Learning Tip
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={form.contentType === 'recipe' ? 'default' : 'outline'}
+                                onClick={() => setContentType('recipe')}
+                            >
+                                <Package className="w-4 h-4 mr-2" /> Recipe
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {form.contentType === 'recipe' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Recipe Ingredients</CardTitle>
+                            <CardDescription>
+                                Select products from the marketplace. On mobile, inactive or out-of-stock products are skipped automatically.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            {form.recipeIngredients.length > 0 ? (
+                                <div className="space-y-2">
+                                    {form.recipeIngredients.map(ingredient => {
+                                        const product = products.find(item => item.id === ingredient.productId);
+                                        const unavailable = product ? product.active === false || product.inStock === false : false;
+                                        return (
+                                            <div key={ingredient.productId} className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border p-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">{ingredient.productName}</p>
+                                                    <p className={`text-xs ${unavailable ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                                        {unavailable ? 'Will be skipped until active and in stock' : 'Available ingredient'}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor={`qty-${ingredient.productId}`} className="text-xs text-muted-foreground">Qty</Label>
+                                                    <Input
+                                                        id={`qty-${ingredient.productId}`}
+                                                        type="number"
+                                                        min="1"
+                                                        value={ingredient.quantity}
+                                                        onChange={(event: ChangeEvent<HTMLInputElement>) => updateIngredientQuantity(ingredient.productId, Number(event.target.value))}
+                                                        className="h-8 w-20"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeIngredient(ingredient.productId)}
+                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                                    No ingredients selected yet. Add products below to power the mobile “Buy ingredients” button.
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                <Input
+                                    value={productSearch}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setProductSearch(event.target.value)}
+                                    placeholder="Search marketplace products..."
+                                />
+                                <div className="max-h-72 overflow-y-auto rounded-lg border divide-y">
+                                    {ingredientOptions.length === 0 ? (
+                                        <div className="p-4 text-sm text-muted-foreground">No marketplace products found.</div>
+                                    ) : (
+                                        ingredientOptions.map(product => {
+                                            const selected = !!product.id && selectedProductIds.has(product.id);
+                                            const unavailable = product.active === false || product.inStock === false;
+                                            return (
+                                                <div key={product.id} className="flex items-center gap-3 p-3">
+                                                    {product.images?.[0] ? (
+                                                        <img src={product.images[0]} alt="" className="h-10 w-10 rounded-md object-cover border" />
+                                                    ) : (
+                                                        <div className="h-10 w-10 rounded-md bg-muted border flex items-center justify-center">
+                                                            <Package className="h-4 w-4 text-muted-foreground" />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium truncate">{product.name}</p>
+                                                        <p className={`text-xs ${unavailable ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                                            {product.priceFormatted} · {unavailable ? 'Unavailable now' : 'Active and in stock'}
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={selected ? 'secondary' : 'outline'}
+                                                        disabled={selected || !product.id}
+                                                        onClick={() => addIngredient(product)}
+                                                    >
+                                                        {selected ? 'Added' : <><Plus className="w-3.5 h-3.5 mr-1.5" /> Add</>}
+                                                    </Button>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
